@@ -1,0 +1,56 @@
+/* Copiado de la versión completa para mantener la UI idéntica */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #e8eef5; background: #0b1220; }
+header { padding: 12px 20px; background: #0f1a2b; border-bottom: 1px solid #25324a; }
+header h1 { margin: 0; font-size: 1.6rem; }
+header p { margin: 4px 0 0; color: #b9c4d2; }
+
+.layout { display: grid; grid-template-columns: 320px 1fr 360px; grid-template-rows: calc(100vh - 86px); gap: 0; }
+.panel { padding: 14px; overflow: auto; height: calc(100vh - 86px); }
+.panel.control { background: #0c1728; border-right: 1px solid #22304a; }
+.panel.visualize { background: #0b1220; }
+.panel.results { background: #0c1728; border-left: 1px solid #22304a; }
+
+.control h2, .results h2 { margin-top: 0; font-size: 1.1rem; }
+.control-group { margin-bottom: 14px; }
+.control-group label { display: block; margin-bottom: 6px; font-weight: 600; }
+.value { font-size: 0.9rem; color: #a9b6c7; margin-top: 4px; }
+.value.small { font-size: 0.8rem; }
+
+input[type="range"] { width: 100%; }
+input[type="number"] { width: 100%; padding: 8px; background: #0b1526; border: 1px solid #22304a; color: #e8eef5; border-radius: 6px; }
+
+.simulate { width: 100%; padding: 10px 12px; background: #2a7de1; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 600; margin: 6px 0 12px; }
+.simulate:hover { background: #1f6bbf; }
+.toggle-views { display: flex; gap: 8px; }
+.toggle-views button { flex: 1; padding: 8px; background: #18263f; color: #e8eef5; border: 1px solid #22304a; border-radius: 6px; cursor: pointer; }
+.toggle-views button:hover { background: #1a2b48; }
+
+.viz { width: 100%; height: calc(100vh - 86px); }
+.hidden { display: none; }
+
+.map-select { height: 220px; border: 1px solid #22304a; border-radius: 8px; overflow: hidden; }
+#map2D { border-left: 1px solid #22304a; }
+
+.results-list { list-style: none; padding: 0; margin: 0 0 12px 0; }
+.results-list li { padding: 8px 8px; background: #0b1526; border: 1px solid #22304a; border-radius: 6px; margin-bottom: 8px; }
+.layers label { display: block; margin-bottom: 8px; }
+.neo-picker { margin-top: 12px; padding: 10px; background: #0b1526; border: 1px solid #22304a; border-radius: 6px; }
+.neo-history { display: flex; flex-direction: column; gap: 6px; }
+.neo-history button { width: 100%; padding: 6px 8px; background: #18263f; color: #e8eef5; border: 1px solid #22304a; border-radius: 6px; cursor: pointer; text-align: left; }
+.neo-history button:hover { background: #1a2b48; }
+
+/* Legend */
+.legend-list { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 6px; }
+.legend-item { display: flex; align-items: center; gap: 8px; background: #0b1526; border: 1px solid #22304a; border-radius: 6px; padding: 6px 8px; color: #e8eef5; }
+.legend-item .swatch { width: 16px; height: 16px; border-radius: 3px; display: inline-block; border: 1px solid rgba(255,255,255,0.25); }
+
+footer { padding: 10px 16px; border-top: 1px solid #25324a; background: #0f1a2b; color: #9fb0c7; }
+
+/* Leaflet dark tweaks */
+.leaflet-container { background: #0b1220; }
+
+/* Tooltip */
+.tooltip { position: relative; display: inline-block; cursor: help; }
+.tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #1c2a45; color: #fff; text-align: left; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -110px; border: 1px solid #2a3b62; }
+.tooltip:hover .tooltiptext { visibility: visible; }

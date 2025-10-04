@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Zona Sísmica Demo" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-120.0, 35.0],
+          [-110.0, 35.0],
+          [-110.0, 45.0],
+          [-120.0, 45.0],
+          [-120.0, 35.0]
+        ]]
+      }
+    }
+  ]
+}

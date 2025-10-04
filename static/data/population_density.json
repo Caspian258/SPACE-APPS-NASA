@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "lat": 40.4168, "lon": -3.7038, "density": 5300 } },
+    { "type": "Feature", "properties": { "lat": 19.4326, "lon": -99.1332, "density": 6100 } },
+    { "type": "Feature", "properties": { "lat": 35.6762, "lon": 139.6503, "density": 6500 } },
+    { "type": "Feature", "properties": { "lat": 6.5244, "lon": 3.3792, "density": 5800 } }
+  ]
+}

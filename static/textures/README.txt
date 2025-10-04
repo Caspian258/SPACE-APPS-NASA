@@ -1,0 +1,1 @@
+Optional: place earth_texture.jpg here (2K equirectangular Earth map). If missing, the globe uses a flat color.
