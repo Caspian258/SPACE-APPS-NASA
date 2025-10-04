@@ -587,6 +587,14 @@ function resizeAsteroidViewer() {
 }
 window.addEventListener('resize', resizeAsteroidViewer);
 
+// Accesibilidad: toggle para modo daltónico
+const colorToggleButton = document.getElementById('color-toggle-btn');
+if (colorToggleButton) {
+  colorToggleButton.addEventListener('click', () => {
+    document.body.classList.toggle('colorblind-mode');
+  });
+}
+
 // Flujo de simulación (sin backend)
 simulateBtn.addEventListener('click', () => {
   if (selectedLat === null || selectedLon === null) { alert('Selecciona un punto de impacto en el mapa de la izquierda.'); return; }
