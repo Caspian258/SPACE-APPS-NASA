@@ -18,7 +18,7 @@ let seismicLayer = null;
 let populationLayer = null;
 
 // UI
-const diameterInput = document.getElementById('diameter');
+const diameterInput = document.getElementById('diameter'); 
 const velocityInput = document.getElementById('velocity');
 const densityInput = document.getElementById('density');
 const mitigationInput = document.getElementById('mitigation');
@@ -635,14 +635,6 @@ function resizeAsteroidViewer() {
   avCamera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resizeAsteroidViewer);
-
-// Accesibilidad: toggle para modo daltónico
-const colorToggleButton = document.getElementById('color-toggle-btn');
-if (colorToggleButton) {
-  colorToggleButton.addEventListener('click', () => {
-    document.body.classList.toggle('colorblind-mode');
-  });
-}
 
 // Flujo de simulación (sin backend)
 simulateBtn.addEventListener('click', () => {
