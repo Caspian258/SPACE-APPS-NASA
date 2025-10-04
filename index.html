@@ -12,9 +12,13 @@
   <header>
     <h1>Asteroid Impact Simulator</h1>
     <p>Explora el impacto de asteroides y estrategias de mitigación.</p>
+    <!-- Botón (imagen) para abrir el Visor de Asteroides -->
+    <button id="openAsteroidViewerBtn" class="icon-button" title="Abrir visor de asteroides">
+      <img src="./static/img/asteroid-icon.png" alt="Abrir visor de asteroides" />
+    </button>
   </header>
 
-  <main class="layout">
+  <main id="simLayout" class="layout">
     <!-- Control Panel -->
     <section class="panel control">
       <h2>Panel de Control</h2>
@@ -122,6 +126,60 @@
       </div>
     </section>
   </main>
+
+  <!-- Visor de Asteroides (oculto por defecto) -->
+  <div id="asteroidViewer" class="viewer hidden">
+    <div class="viewer-header">
+      <h2>Visor de Asteroides</h2>
+      <button id="closeViewerBtn" class="simulate" style="width:auto;background:#444e5f;">Volver</button>
+    </div>
+    <div class="viewer-grid">
+      <!-- Columna Izquierda: Controles e Información -->
+      <div class="viewer-left">
+        <div class="control-group" style="margin-top:0;">
+          <label for="modeToggle">Modo</label>
+          <button id="modeToggle" class="toggle">Modo Manual</button>
+          <div class="value small">Pulsa para alternar entre Manual y API</div>
+        </div>
+
+        <!-- Controles: Modo Manual -->
+        <div id="manualControls">
+          <div class="control-group">
+            <label for="manSpeed">Velocidad (unid.)</label>
+            <input type="range" id="manSpeed" min="0" max="60" step="0.1" value="10" />
+            <div class="value" id="manSpeedValue">10.0</div>
+          </div>
+          <div class="control-group">
+            <label for="manDensity">Densidad (kg/m³)</label>
+            <input type="range" id="manDensity" min="500" max="8000" step="100" value="3000" />
+            <div class="value" id="manDensityValue">3000 kg/m³</div>
+          </div>
+          <div class="control-group">
+            <label for="manRotation">Rotación (°/s)</label>
+            <input type="range" id="manRotation" min="0" max="30" step="0.1" value="5" />
+            <div class="value" id="manRotationValue">5.0 °/s</div>
+          </div>
+        </div>
+
+        <!-- Controles: Modo API -->
+        <div id="apiControls" class="hidden">
+          <div class="control-group">
+            <label for="apiAsteroidSelect">Lista de asteroides (mock)</label>
+            <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
+          </div>
+          <div class="control-group">
+            <label for="apiAsteroidDetails">Detalles</label>
+            <textarea id="apiAsteroidDetails" rows="6" readonly style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;resize:vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Visualización 3D -->
+      <div class="viewer-right">
+        <div id="asteroidCanvas" class="viz"></div>
+      </div>
+    </div>
+  </div>
 
   <footer>
     <small>Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
