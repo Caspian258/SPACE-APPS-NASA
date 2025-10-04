@@ -51,6 +51,23 @@ const show2D = document.getElementById('show2D');
 const globe3D = document.getElementById('globe3D');
 const map2D = document.getElementById('map2D');
 
+// Visor de Asteroides UI refs
+const simLayout = document.getElementById('simLayout');
+const asteroidViewer = document.getElementById('asteroidViewer');
+const openAsteroidViewerBtn = document.getElementById('openAsteroidViewerBtn');
+const modeToggle = document.getElementById('modeToggle');
+const manualControls = document.getElementById('manualControls');
+const apiControls = document.getElementById('apiControls');
+const manSpeed = document.getElementById('manSpeed');
+const manDensity = document.getElementById('manDensity');
+const manRotation = document.getElementById('manRotation');
+const manSpeedValue = document.getElementById('manSpeedValue');
+const manDensityValue = document.getElementById('manDensityValue');
+const manRotationValue = document.getElementById('manRotationValue');
+const apiAsteroidSelect = document.getElementById('apiAsteroidSelect');
+const apiAsteroidDetails = document.getElementById('apiAsteroidDetails');
+const asteroidCanvas = document.getElementById('asteroidCanvas');
+
 // Mostrar valores de sliders
 function updateSliderDisplays() {
   diameterValue.textContent = `${diameterInput.value} m`;
@@ -394,6 +411,181 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 initThree();
+
+// ============== Visor de Asteroides ==============
+// Estado del visor
+let viewerMode = 'manual'; // 'manual' | 'api'
+
+// TODO: Reemplazar esta lista con los datos de la API real.
+const mockAsteroids = [
+  { name: "Ceres-M", diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1 },
+  { name: "Pallas-M", diameter: 512, velocity: 16.5, density: 2800, rotation_period: 7.8 },
+  { name: "Vesta-M", diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3 },
+  { name: "Hygiea-M", diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8 },
+  { name: "Apophis-M", diameter: 0.37, velocity: 30.7, density: 2600, rotation_period: 30.6 }
+];
+
+// Three.js para el visor de asteroides
+let avRenderer, avScene, avCamera, avAsteroid, avLight;
+
+function initAsteroidViewerThree() {
+  if (!THREE_NS) {
+    asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
+    return;
+  }
+  const width = asteroidCanvas.clientWidth;
+  const height = asteroidCanvas.clientHeight;
+  avRenderer = new THREE_NS.WebGLRenderer({ antialias: true });
+  avRenderer.setSize(width, height);
+  avRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  asteroidCanvas.innerHTML = '';
+  asteroidCanvas.appendChild(avRenderer.domElement);
+
+  avScene = new THREE_NS.Scene();
+  avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
+  avCamera.position.set(0, 0, 3);
+
+  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.6); avScene.add(ambient);
+  avLight = new THREE_NS.DirectionalLight(0xffffff, 1.0); avLight.position.set(3, 2, 4); avScene.add(avLight);
+
+  const geo = new THREE_NS.SphereGeometry(1, 64, 64);
+  const loader = new THREE_NS.TextureLoader();
+  loader.load('./static/textures/asteroid-texture.jpg', (tex) => {
+    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 }));
+    avScene.add(avAsteroid);
+  }, undefined, () => {
+    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ color: 0x8a7f70 }));
+    avScene.add(avAsteroid);
+  });
+
+  addAsteroidViewerControls();
+  requestAnimationFrame(asteroidViewerAnimate);
+}
+
+let avRotSpeed = 0.01; // rad/frame
+function asteroidViewerAnimate() {
+  requestAnimationFrame(asteroidViewerAnimate);
+  if (avAsteroid) {
+    avAsteroid.rotation.y += avRotSpeed;
+  }
+  if (avRenderer && avScene && avCamera) avRenderer.render(avScene, avCamera);
+}
+
+function addAsteroidViewerControls() {
+  if (!avRenderer) return;
+  const el = avRenderer.domElement;
+  let dragging = false, lastX = 0, lastY = 0;
+  el.style.cursor = 'grab';
+  el.addEventListener('pointerdown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; el.style.cursor = 'grabbing'; });
+  window.addEventListener('pointermove', (e)=>{
+    if (!dragging || !avAsteroid) return;
+    const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+    avAsteroid.rotation.y += dx * 0.01; avAsteroid.rotation.x += dy * 0.01; lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('pointerup', ()=>{ dragging = false; el.style.cursor = 'grab'; });
+  el.addEventListener('wheel', (e)=>{ e.preventDefault(); const d = Math.sign(e.deltaY); avCamera.position.z = Math.max(1.5, Math.min(6, avCamera.position.z + d*0.2)); }, { passive: false });
+}
+
+function updateManualDisplay() {
+  manSpeedValue.textContent = Number(manSpeed.value).toFixed(1);
+  manDensityValue.textContent = `${manDensity.value} kg/m³`;
+  manRotationValue.textContent = `${Number(manRotation.value).toFixed(1)} °/s`;
+}
+[manSpeed, manDensity, manRotation].forEach(el => el && el.addEventListener('input', ()=>{
+  updateManualDisplay();
+  if (viewerMode === 'manual') applyManualTo3D();
+}));
+updateManualDisplay();
+
+function applyManualTo3D() {
+  if (!avAsteroid) return;
+  // Tamaño proporcional a densidad de forma simple (mock): escalar entre 0.5 y 1.3
+  const density = Number(manDensity.value);
+  const scale = 0.5 + (density - 500) / (8000 - 500) * (1.3 - 0.5);
+  avAsteroid.scale.setScalar(Math.max(0.3, Math.min(1.5, scale)));
+  // Velocidad de rotación: base en Rotación (°/s) modulada por Velocidad
+  const degPerSec = Number(manRotation.value);
+  const speed = Number(manSpeed.value);
+  const speedFactor = 0.5 + (speed / 60); // 0..60 -> 0.5x .. 1.5x
+  avRotSpeed = (degPerSec * Math.PI / 180) * 0.016 * speedFactor; // ~60fps
+}
+
+function populateApiSelect() {
+  apiAsteroidSelect.innerHTML = '';
+  mockAsteroids.forEach((a, idx) => {
+    const opt = document.createElement('option');
+    opt.value = String(idx);
+    opt.textContent = `${a.name} — Ø ${a.diameter} km, v ${a.velocity} km/s`;
+    apiAsteroidSelect.appendChild(opt);
+  });
+  updateApiDetails();
+}
+
+function updateApiDetails() {
+  const idx = Number(apiAsteroidSelect.value || 0);
+  const a = mockAsteroids[idx];
+  if (!a) { apiAsteroidDetails.value = ''; return; }
+  apiAsteroidDetails.value = `Nombre: ${a.name}\nDiámetro: ${a.diameter} km\nVelocidad: ${a.velocity} km/s\nDensidad: ${a.density} kg/m³\nPeriodo de rotación: ${a.rotation_period} h`;
+  // Al seleccionar, actualizar sliders y 3D y desactivar sliders en modo API
+  manSpeed.value = a.velocity.toString();
+  manDensity.value = a.density.toString();
+  // Aproximación: rotación deg/s desde horas -> suponemos 360° por periodo
+  const degPerSec = 360 / (a.rotation_period * 3600);
+  manRotation.value = (degPerSec * 100).toFixed(1); // amplificar para visualización
+  updateManualDisplay();
+  applyManualTo3D();
+}
+
+apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', updateApiDetails);
+
+function setViewerMode(mode) {
+  viewerMode = mode;
+  if (mode === 'manual') {
+    manualControls.classList.remove('hidden');
+    apiControls.classList.add('hidden');
+    modeToggle.textContent = 'Modo Manual';
+    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = false);
+  } else {
+    manualControls.classList.add('hidden');
+    apiControls.classList.remove('hidden');
+    modeToggle.textContent = 'Modo API';
+    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = true);
+    populateApiSelect();
+  }
+}
+
+modeToggle && modeToggle.addEventListener('click', ()=>{
+  setViewerMode(viewerMode === 'manual' ? 'api' : 'manual');
+});
+
+// Toggle view with the header icon. The icon image swaps between asteroid-icon.png and planet-icon.png
+openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', ()=>{
+  const img = openAsteroidViewerBtn.querySelector('img');
+  const isViewerOpen = !asteroidViewer.classList.contains('hidden');
+  if (isViewerOpen) {
+    // Close viewer -> show simulation
+    asteroidViewer.classList.add('hidden');
+    simLayout.classList.remove('hidden');
+    if (img) img.src = './static/img/asteroid-icon.png';
+  } else {
+    // Open viewer -> hide simulation
+    simLayout.classList.add('hidden');
+    asteroidViewer.classList.remove('hidden');
+    if (img) img.src = './static/img/planet-icon.png';
+    if (!avRenderer) initAsteroidViewerThree();
+    setViewerMode('manual');
+    setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
+  }
+});
+
+function resizeAsteroidViewer() {
+  if (!avRenderer || !avCamera) return;
+  const w = asteroidCanvas.clientWidth; const h = asteroidCanvas.clientHeight;
+  avRenderer.setSize(w, h);
+  avCamera.aspect = Math.max(0.1, w / Math.max(1, h));
+  avCamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeAsteroidViewer);
 
 // Flujo de simulación (sin backend)
 simulateBtn.addEventListener('click', () => {
