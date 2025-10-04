@@ -55,7 +55,6 @@ const map2D = document.getElementById('map2D');
 const simLayout = document.getElementById('simLayout');
 const asteroidViewer = document.getElementById('asteroidViewer');
 const openAsteroidViewerBtn = document.getElementById('openAsteroidViewerBtn');
-const closeViewerBtn = document.getElementById('closeViewerBtn');
 const modeToggle = document.getElementById('modeToggle');
 const manualControls = document.getElementById('manualControls');
 const apiControls = document.getElementById('apiControls');
@@ -559,20 +558,24 @@ modeToggle && modeToggle.addEventListener('click', ()=>{
   setViewerMode(viewerMode === 'manual' ? 'api' : 'manual');
 });
 
+// Toggle view with the header icon. The icon image swaps between asteroid-icon.png and planet-icon.png
 openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', ()=>{
-  // Ocultar simulación y mostrar visor
-  simLayout.classList.add('hidden');
-  asteroidViewer.classList.remove('hidden');
-  if (!avRenderer) initAsteroidViewerThree();
-  // Por defecto, entrar en modo manual
-  setViewerMode('manual');
-  // Ajustar tamaños del canvas
-  setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
-});
-
-closeViewerBtn && closeViewerBtn.addEventListener('click', ()=>{
-  asteroidViewer.classList.add('hidden');
-  simLayout.classList.remove('hidden');
+  const img = openAsteroidViewerBtn.querySelector('img');
+  const isViewerOpen = !asteroidViewer.classList.contains('hidden');
+  if (isViewerOpen) {
+    // Close viewer -> show simulation
+    asteroidViewer.classList.add('hidden');
+    simLayout.classList.remove('hidden');
+    if (img) img.src = './static/img/asteroid-icon.png';
+  } else {
+    // Open viewer -> hide simulation
+    simLayout.classList.add('hidden');
+    asteroidViewer.classList.remove('hidden');
+    if (img) img.src = './static/img/planet-icon.png';
+    if (!avRenderer) initAsteroidViewerThree();
+    setViewerMode('manual');
+    setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
+  }
 });
 
 function resizeAsteroidViewer() {
