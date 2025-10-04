@@ -657,3 +657,20 @@ simulateBtn.addEventListener('click', () => {
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
 });
+
+// Accesibilidad: botón de modo daltónico (toggle en <body>)
+(function(){
+  const colorToggleButton = document.getElementById('color-toggle-btn');
+  if (!colorToggleButton) return;
+  // Restaurar preferencia guardada (opcional)
+  try {
+    const saved = localStorage.getItem('colorblind-mode');
+    if (saved === '1') document.body.classList.add('colorblind-mode');
+  } catch (_) {}
+  colorToggleButton.addEventListener('click', () => {
+    document.body.classList.toggle('colorblind-mode');
+    try {
+      localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
+    } catch (_) {}
+  });
+})();
