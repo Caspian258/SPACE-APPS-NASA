@@ -410,6 +410,40 @@ legend.onAdd = function() {
   return div;
 };
 legend.addTo(map);
+// Second legend for fireball calculations
+const legend2 = L.control({ position: 'bottomright' });
+legend2.onAdd = function() {
+  const div = L.DomUtil.create('div', 'leaflet-control legend');
+  div.style.background = '#0b1526';
+  div.style.border = '1px solid #22304a';
+  div.style.borderRadius = '6px';
+  div.style.padding = '8px';
+  div.style.color = '#e8eef5';
+  div.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+  div.style.marginBottom = '8px';
+  
+  const diameter = parseFloat(diameterInput.value);
+  const velocity = parseFloat(velocityInput.value);
+  const density = parseFloat(densityInput.value);
+  
+  const radius_m = diameter / 2;
+  const volume = (4/3) * Math.PI * Math.pow(radius_m, 3);
+  const mass = density * volume;
+  
+  const velocity_ms = velocity * 1000;
+  const energy_J = 0.5 * mass * Math.pow(velocity_ms, 2);
+  
+  const R_f = 0.002 * Math.pow(energy_J, 1/3);
+  const T_f = R_f / velocity_ms;
+  
+  div.innerHTML = `
+    <div style="font-weight:600;margin-bottom:6px;">Bola de Fuego</div>
+    <div style="margin-bottom:4px;">Radio: ${R_f.toFixed(2)} m</div>
+    <div>Duración: ${T_f.toFixed(3)} s</div>
+  `;
+  return div;
+};
+legend2.addTo(map);
 
 // Capas de datos simuladas (carga desde /static/data si existen)
 fetch('static/data/seismic_zones.geojson').then(r=>r.json()).then(geo=>{
@@ -2282,6 +2316,8 @@ simulateBtn.addEventListener('click', () => {
   drawEffectZones(data.impactLat, data.impactLon, data.craterDiameterKM, data.effectZones);
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
+  map.removeControl(legend2);
+  legend2.addTo(map);
 });
 
 const accessibilityMenuButton = document.getElementById('accessibilityMenuButton');
