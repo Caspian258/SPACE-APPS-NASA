@@ -27,6 +27,7 @@ let avRotSpeed = 0.01;
 let casualtyCircles = [];
 let seismicCircles = [];
 let currentVisualization = 'crater'; // Default view
+let craterCircle = null;
 
 // UI
 const diameterInput = document.getElementById('diameter'); 
@@ -64,6 +65,11 @@ const translations = {
   es: {
     title: 'Asteroid Impact Simulator',
     subtitle: 'Explora el impacto de asteroides y estrategias de mitigación.',
+    'mode.primaryAria': 'Selecciona el modo principal',
+    'mode.impact': 'Simulación de Impacto',
+    'mode.orbit': 'Simulación de Órbita',
+    'orbit.placeholderTitle': 'Simulación de Órbita',
+    'orbit.placeholderDescription': 'Interactúa con la vista 3D para seguir la órbita seleccionada y revisa los detalles del objeto en el panel derecho.',
     controlPanelHeading: 'Panel de Control',
     'label.diameter': 'Diámetro del Asteroide (m)',
     'label.velocity': 'Velocidad del Asteroide (km/s)',
@@ -71,83 +77,83 @@ const translations = {
     'label.selectImpact': 'Selecciona el punto de impacto',
     'label.mitigation': 'Ángulo de impacto (°)',
     'button.simulate': '¡Simular Impacto!',
-    'button.view3D': 'Ver Globo 3D',
-    'button.view2D': 'Ver Mapa 2D',
+    'button.view3D': 'Mostrar globo 3D',
+    'button.view2D': 'Mostrar mapa 2D',
     'label.catalogHeading': 'Catálogo de objetos',
     'radio.asteroids': 'Asteroides',
     'radio.comets': 'Cometas',
-    'label.selectObject': 'Seleccionar objeto',
+    'label.selectObject': 'Selecciona un objeto',
     'label.filterName': 'Buscar por nombre',
-    'placeholder.filterName': 'Ej: Apophis',
+    'placeholder.filterName': 'ej. Apophis',
     'label.filterMinDiameter': 'Diámetro mínimo (km)',
     'label.filterMinVelocity': 'Velocidad mínima (km/s)',
     'placeholder.numeric': '0.0',
-    'label.discoveryRange': 'Rango de fechas de descubrimiento',
-    'button.calculateProbability': 'Calcular Probabilidad de Impacto',
-  'option.loadingCatalog': 'Cargando catálogo...',
-  'option.emptyCatalog': 'Sin datos disponibles',
-  'message.noDataAvailable': 'No hay datos disponibles',
-  'message.selectFromCatalog': 'Selecciona un objeto del catálogo',
-  'summary.type.asteroid': 'Asteroide',
-  'summary.type.comet': 'Cometa',
-  'summary.diameter': 'Diámetro',
-  'summary.semiMajor': 'a',
-  'summary.eccentricity': 'e',
-  'details.name': 'Nombre',
-  'details.type': 'Tipo',
-  'details.type.asteroid': 'Asteroide',
-  'details.type.comet': 'Cometa',
-  'details.estimatedDiameter': 'Diámetro estimado',
-  'details.modelDensity': 'Densidad modelo',
-  'details.rotationPeriod': 'Periodo de rotación aprox.',
-  'details.velocity': 'Velocidad estimada',
-  'details.semiMajor': 'Semieje mayor (a)',
-  'details.eccentricity': 'Excentricidad (e)',
-  'details.inclination': 'Inclinación (i)',
-  'details.ascendingNode': 'Nodo ascendente (Ω)',
-  'details.argPeriapsis': 'Arg. del perihelio (ω)',
-  'details.orbitalPeriod': 'Período orbital',
-  'details.discovery': 'Descubierto',
-  'details.rotationHours': 'h',
-  'units.years': 'años',
+    'label.discoveryRange': 'Rango de descubrimiento',
+    'button.calculateProbability': 'Calcular probabilidad de impacto',
+    'option.loadingCatalog': 'Cargando catálogo...',
+    'option.emptyCatalog': 'No hay datos disponibles',
+    'message.noDataAvailable': 'No hay datos disponibles',
+    'message.selectFromCatalog': 'Elige un objeto del catálogo',
+    'summary.type.asteroid': 'Asteroide',
+    'summary.type.comet': 'Cometa',
+    'summary.diameter': 'Diámetro',
+    'summary.semiMajor': 'a',
+    'summary.eccentricity': 'e',
+    'details.name': 'Nombre',
+    'details.type': 'Tipo',
+    'details.type.asteroid': 'Asteroide',
+    'details.type.comet': 'Cometa',
+    'details.estimatedDiameter': 'Diámetro estimado',
+    'details.modelDensity': 'Densidad del modelo',
+    'details.rotationPeriod': 'Periodo de rotación aprox.',
+    'details.velocity': 'Velocidad estimada',
+    'details.semiMajor': 'Semieje mayor (a)',
+    'details.eccentricity': 'Excentricidad (e)',
+    'details.inclination': 'Inclinación (i)',
+    'details.ascendingNode': 'Nodo ascendente (Ω)',
+    'details.argPeriapsis': 'Argumento del perihelio (ω)',
+    'details.orbitalPeriod': 'Periodo orbital',
+    'details.discovery': 'Descubierto',
+    'details.rotationHours': 'h',
+    'units.years': 'años',
     resultsHeading: 'Resultados',
-    'results.energy': 'Energía de Impacto:',
+    'results.energy': 'Energía del impacto:',
     'results.craterType': 'Tipo de cráter:',
     'results.initialDiameter': 'Diámetro inicial:',
     'results.finalDiameter': 'Diámetro final:',
     'results.finalDepth': 'Profundidad final:',
-    'results.rimHeight': 'Altura de cresta:',
-    'results.probability': 'Probabilidad de Impacto por Órbita (debug):',
+    'results.rimHeight': 'Altura del borde:',
+    'results.probability': 'Probabilidad de impacto orbital (debug):',
     'units.megatons': 'Megatones',
     'units.meters': 'm',
-    'neo.heading': 'Selecciona un NEO',
+    'neo.heading': 'Elige un NEO',
     'neo.source': 'Fuente: NASA NeoWs (demo)',
     'button.apply': 'Aplicar',
     'button.close': 'Cerrar',
-    'viewer.heading': 'Visor de Asteroides',
+    'viewer.heading': 'Visor de asteroides',
     'viewer.modeLabel': 'Modo',
-    'viewer.modeManual': 'Modo Manual',
-  'viewer.modeApi': 'Modo API',
-    'viewer.modeHint': 'Pulsa para alternar entre Manual y API',
+    'viewer.modeManual': 'Modo manual',
+    'viewer.modeApi': 'Modo API',
+    'viewer.modeHint': 'Toca para alternar entre Manual y API',
     'viewer.manual.diameter': 'Diámetro (km)',
-    'viewer.manual.speed': 'Velocidad (unid.)',
+    'viewer.manual.speed': 'Velocidad (unidades)',
     'viewer.manual.density': 'Densidad (kg/m³)',
     'viewer.manual.rotation': 'Rotación (°/s)',
     'viewer.api.sourceLabel': 'Fuente de datos',
-    'viewer.api.listLabel': 'Lista de asteroides (catálogo)',
+    'viewer.api.listLabel': 'Lista del catálogo',
     'viewer.api.detailsLabel': 'Detalles',
-    'footer.disclaimer': 'Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)',
+    'footer.disclaimer': 'Datos: APIs de la NASA y USGS (simulado). Este simulador es educativo y simplificado. (Frontend independiente)',
     'menu.accessibility': 'Accesibilidad y ayuda',
-    'menu.colorToggle': 'Modo daltónico',
+    'menu.colorToggle': 'Modo daltonismo',
     'menu.faq': 'Preguntas frecuentes',
     'menu.languageLabel': 'Idioma',
     'menu.lang.es': 'Español',
-    'menu.lang.en': 'English',
+    'menu.lang.en': 'Inglés',
     'faq.title': 'Preguntas frecuentes',
-    'faq.q1': '¿Cómo selecciono un punto de impacto?',
-    'faq.a1': 'Usa el mapa de selección en el panel izquierdo y haz clic en la ubicación deseada. El marcador mostrará las coordenadas exactas.',
-    'faq.q2': '¿Qué significa el modo daltónico?',
-    'faq.a2': 'Activa una paleta de alto contraste pensada para usuarios con daltonismo y condiciones de baja visibilidad.',
+    'faq.q1': '¿Cómo elijo un punto de impacto?',
+    'faq.a1': 'Usa el mapa de selección en el panel izquierdo y haz clic en la ubicación deseada. El marcador muestra las coordenadas exactas.',
+    'faq.q2': '¿Qué hace el modo daltonismo?',
+    'faq.a2': 'Activa una paleta de alto contraste diseñada para usuarios con deficiencia de visión cromática y condiciones de baja visibilidad.',
     'faq.q3': '¿Cómo cambio entre asteroides y cometas?',
     'faq.a3': 'Utiliza los botones de radio en el catálogo o en el visor 3D para alternar entre los conjuntos de datos disponibles.',
     'faq.closeAria': 'Cerrar'
@@ -155,6 +161,11 @@ const translations = {
   en: {
     title: 'Asteroid Impact Simulator',
     subtitle: 'Explore asteroid impacts and mitigation strategies.',
+    'mode.primaryAria': 'Select the primary mode',
+    'mode.impact': 'Impact Simulation',
+    'mode.orbit': 'Orbit Simulation',
+    'orbit.placeholderTitle': 'Orbit Simulation',
+    'orbit.placeholderDescription': 'Use the 3D view to explore the selected orbit and review the object details in the right-hand panel.',
     controlPanelHeading: 'Control Panel',
     'label.diameter': 'Asteroid Diameter (m)',
     'label.velocity': 'Asteroid Velocity (km/s)',
@@ -175,32 +186,32 @@ const translations = {
     'placeholder.numeric': '0.0',
     'label.discoveryRange': 'Discovery date range',
     'button.calculateProbability': 'Compute Impact Probability',
-  'option.loadingCatalog': 'Loading catalog...',
-  'option.emptyCatalog': 'No data available',
-  'message.noDataAvailable': 'No data available',
-  'message.selectFromCatalog': 'Pick an object from the catalog',
-  'summary.type.asteroid': 'Asteroid',
-  'summary.type.comet': 'Comet',
-  'summary.diameter': 'Diameter',
-  'summary.semiMajor': 'a',
-  'summary.eccentricity': 'e',
-  'details.name': 'Name',
-  'details.type': 'Type',
-  'details.type.asteroid': 'Asteroid',
-  'details.type.comet': 'Comet',
-  'details.estimatedDiameter': 'Estimated diameter',
-  'details.modelDensity': 'Model density',
-  'details.rotationPeriod': 'Approx. rotation period',
-  'details.velocity': 'Estimated velocity',
-  'details.semiMajor': 'Semi-major axis (a)',
-  'details.eccentricity': 'Eccentricity (e)',
-  'details.inclination': 'Inclination (i)',
-  'details.ascendingNode': 'Ascending node (Ω)',
-  'details.argPeriapsis': 'Argument of perihelion (ω)',
-  'details.orbitalPeriod': 'Orbital period',
-  'details.discovery': 'Discovered',
-  'details.rotationHours': 'h',
-  'units.years': 'years',
+    'option.loadingCatalog': 'Loading catalog...',
+    'option.emptyCatalog': 'No data available',
+    'message.noDataAvailable': 'No data available',
+    'message.selectFromCatalog': 'Pick an object from the catalog',
+    'summary.type.asteroid': 'Asteroid',
+    'summary.type.comet': 'Comet',
+    'summary.diameter': 'Diameter',
+    'summary.semiMajor': 'a',
+    'summary.eccentricity': 'e',
+    'details.name': 'Name',
+    'details.type': 'Type',
+    'details.type.asteroid': 'Asteroid',
+    'details.type.comet': 'Comet',
+    'details.estimatedDiameter': 'Estimated diameter',
+    'details.modelDensity': 'Model density',
+    'details.rotationPeriod': 'Approx. rotation period',
+    'details.velocity': 'Estimated velocity',
+    'details.semiMajor': 'Semi-major axis (a)',
+    'details.eccentricity': 'Eccentricity (e)',
+    'details.inclination': 'Inclination (i)',
+    'details.ascendingNode': 'Ascending node (Ω)',
+    'details.argPeriapsis': 'Argument of perihelion (ω)',
+    'details.orbitalPeriod': 'Orbital period',
+    'details.discovery': 'Discovered',
+    'details.rotationHours': 'h',
+    'units.years': 'years',
     resultsHeading: 'Results',
     'results.energy': 'Impact Energy:',
     'results.craterType': 'Crater type:',
@@ -218,7 +229,7 @@ const translations = {
     'viewer.heading': 'Asteroid Viewer',
     'viewer.modeLabel': 'Mode',
     'viewer.modeManual': 'Manual Mode',
-  'viewer.modeApi': 'API Mode',
+    'viewer.modeApi': 'API Mode',
     'viewer.modeHint': 'Tap to switch between Manual and API',
     'viewer.manual.diameter': 'Diameter (km)',
     'viewer.manual.speed': 'Speed (units)',
@@ -309,49 +320,153 @@ function setLanguage(lang) {
     btn.classList.toggle('active', option === lang);
   });
 
-  if (modeToggle) {
-    const modeKey = viewerMode === 'manual' ? 'viewer.modeManual' : 'viewer.modeApi';
-    const label = dict[modeKey];
-    if (label) modeToggle.textContent = label;
-  }
-
   updateSliderDisplays();
-  updateManualDisplay();
   updateObjectSummary(getCurrentSelectedItem());
-  updateApiDetails();
+  refreshOrbitDetails();
 }
 
 // Vistas
-const show3D = document.getElementById('show3D');
-const show2D = document.getElementById('show2D');
-
 const map2D = document.getElementById('map2D');
+const globe3DContainer = document.getElementById('globe3D');
 const objectSelect = document.getElementById('objectSelect');
 const objectSummary = document.getElementById('objectSummary');
 const datasetMainRadios = document.querySelectorAll('input[name="datasetMain"]');
-const datasetViewerRadios = document.querySelectorAll('input[name="datasetViewer"]');
 const filterNameInput = document.getElementById('filterName');
 const filterMinDiameterInput = document.getElementById('filterMinDiameter');
 const filterMinVelocityInput = document.getElementById('filterMinVelocity');
 const filterDateStartInput = document.getElementById('filterDateStart');
 const filterDateEndInput = document.getElementById('filterDateEnd');
+const primaryModeRadios = document.querySelectorAll('input[name="primaryMode"]');
+const impactModeContainer = document.getElementById('impactModeContainer');
+const orbitModeContainer = document.getElementById('orbitModeContainer');
+const craterImageWrapper = document.getElementById('craterImageWrapper');
+const craterImage = document.getElementById('crater-image');
+const IMPACT_HIDE_CLASS = 'impact-mode-hide';
+let currentPrimaryMode = 'impact';
+
+function initializeImpactModeVisibility() {
+  if (!impactModeContainer) return;
+
+  const controlPanel = impactModeContainer.querySelector('.panel.control');
+  if (controlPanel) {
+    const allowedElements = new Set();
+    const heading = controlPanel.querySelector('h2');
+    if (heading) allowedElements.add(heading);
+    const diameterGroup = diameterInput?.closest('.control-group');
+    const velocityGroup = velocityInput?.closest('.control-group');
+    const densityGroup = densityInput?.closest('.control-group');
+    const mapGroup = document.getElementById('selectMap')?.closest('.control-group');
+    [diameterGroup, velocityGroup, densityGroup, mapGroup].forEach((el) => {
+      if (el) allowedElements.add(el);
+    });
+    if (simulateBtn) {
+      allowedElements.add(simulateBtn);
+    }
+
+    Array.from(controlPanel.children).forEach((child) => {
+      if (!allowedElements.has(child)) {
+        child.classList.add(IMPACT_HIDE_CLASS);
+      }
+    });
+  }
+
+  const probabilityItem = document.getElementById('probability-result')?.closest('li');
+  if (probabilityItem) {
+    probabilityItem.classList.add(IMPACT_HIDE_CLASS);
+  }
+
+  const neoPicker = document.getElementById('neoPicker');
+  if (neoPicker) {
+    neoPicker.classList.add(IMPACT_HIDE_CLASS);
+  }
+}
+
+function updateCraterImageDisplay(craterTypeValue) {
+  if (!craterImageWrapper || !craterImage) return;
+
+  const normalized = (craterTypeValue || '').toLowerCase();
+  let src = '';
+
+  if (normalized.includes('simple')) {
+    src = './static/img/crater_simple.jpeg';
+  } else if (normalized.includes('complejo') || normalized.includes('complex')) {
+    src = './static/img/crater_complejo.jpeg';
+  }
+
+  if (src) {
+    if (craterImage.getAttribute('src') !== src) {
+      craterImage.setAttribute('src', src);
+    }
+    craterImageWrapper.classList.remove('hidden');
+  } else {
+    craterImage.removeAttribute('src');
+    craterImageWrapper.classList.add('hidden');
+  }
+}
+
+function setPrimaryMode(mode) {
+  const nextMode = mode === 'orbit' ? 'orbit' : 'impact';
+  currentPrimaryMode = nextMode;
+
+  if (impactModeContainer) {
+    impactModeContainer.classList.remove('hidden');
+  }
+
+  if (orbitModeContainer) {
+    orbitModeContainer.classList.toggle('hidden', nextMode !== 'orbit');
+  }
+
+  if (nextMode === 'impact') {
+    if (globe3DContainer) {
+      globe3DContainer.classList.add('hidden');
+    }
+    if (map2D) {
+      map2D.classList.remove('hidden');
+      try {
+        map.invalidateSize();
+      } catch (err) {
+        // Map may not be initialized yet; ignore.
+      }
+    }
+  } else {
+    if (map2D) {
+      map2D.classList.add('hidden');
+    }
+    if (globe3DContainer) {
+      globe3DContainer.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        if (typeof onResize === 'function') {
+          onResize();
+        }
+        if (typeof resizeAsteroidViewer === 'function') {
+          resizeAsteroidViewer();
+        }
+      });
+    }
+  }
+
+  primaryModeRadios.forEach((radio) => {
+    const isActive = radio.value === nextMode;
+    if (radio.checked !== isActive) {
+      radio.checked = isActive;
+    }
+    radio.closest('.mode-option')?.classList.toggle('mode-option--active', isActive);
+  });
+
+  document.body.classList.toggle('impact-mode-active', nextMode === 'impact');
+  document.body.classList.toggle('orbit-mode-active', nextMode === 'orbit');
+}
+
+if (primaryModeRadios.length) {
+  initializeImpactModeVisibility();
+  primaryModeRadios.forEach((radio) => {
+    radio.addEventListener('change', (event) => {
+      setPrimaryMode(event.target.value);
+    });
+  });
+}
 
 // Visor de Asteroides UI refs
-const simLayout = document.getElementById('simLayout');
-const asteroidViewer = document.getElementById('asteroidViewer');
-const openAsteroidViewerBtn = document.getElementById('openAsteroidViewerBtn');
-const modeToggle = document.getElementById('modeToggle');
-const manualControls = document.getElementById('manualControls');
-const apiControls = document.getElementById('apiControls');
-const manDiameter = document.getElementById('manDiameter');
-const manDiameterValue = document.getElementById('manDiameterValue');
-const manSpeed = document.getElementById('manSpeed');
-const manDensity = document.getElementById('manDensity');
-const manRotation = document.getElementById('manRotation');
-const manSpeedValue = document.getElementById('manSpeedValue');
-const manDensityValue = document.getElementById('manDensityValue');
-const manRotationValue = document.getElementById('manRotationValue');
-const apiAsteroidSelect = document.getElementById('apiAsteroidSelect');
 const apiAsteroidDetails = document.getElementById('apiAsteroidDetails');
 const asteroidCanvas = document.getElementById('asteroidCanvas');
 
@@ -393,11 +508,12 @@ selectionMap.on('click', (e) => {
 const map = L.map('map2D').setView([20, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(map);
 
+if (primaryModeRadios.length) {
+  setPrimaryMode('impact');
+}
+
 
 // Vistas 2D/3D
-show3D.addEventListener('click', () => { globe3D.classList.remove('hidden'); map2D.classList.add('hidden'); onResize(); });
-show2D.addEventListener('click', () => { map2D.classList.remove('hidden'); globe3D.classList.add('hidden'); map.invalidateSize(); });
-
 // --- Variables globales ---
 const THREE_NS = window.THREE;
 let renderer, scene, camera;
@@ -419,7 +535,7 @@ let isPaused = false;
 let isFollowingEarth = false; 
 
 // Contenedor del DOM (USANDO NOMBRE ALTERNATIVO: threeContainer)
-const threeContainer = document.getElementById('globe3D') || { 
+const threeContainer = globe3DContainer || { 
     clientWidth: 600, 
     clientHeight: 400, 
     innerHTML: '', 
@@ -1131,16 +1247,18 @@ function add3DControls() {
 
 
 function onResize() {
-  if (!renderer || !camera) return;
-  const width = globe3D.clientWidth; const height = globe3D.clientHeight;
-  renderer.setSize(width, height); camera.aspect = width/height; camera.updateProjectionMatrix();
+  if (!renderer || !camera || !globe3DContainer) return;
+  const width = Math.max(1, globe3DContainer.clientWidth || globe3DContainer.offsetWidth || 600);
+  const height = Math.max(1, globe3DContainer.clientHeight || globe3DContainer.offsetHeight || 400);
+  renderer.setSize(width, height);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', onResize);
 initThree();
 
 // ============== Visor de Asteroides ==============
-// Estado del visor
-let viewerMode = 'manual'; // 'manual' | 'api'
+let currentViewerObject = null;
 
 const FALLBACK_ASTEROIDS = [
   { full_name: 'Asteroide Bennu (Ejemplo)', diameter: 0.49, velocity: 28.0, density: 1260, rotation_period: 4.3, seed: 101, a: 1.126, e: 0.204, i: 6.035, om: 2.1, w: 66.1, ma: 10.4, discovery_date: '1999-09-11' },
@@ -1393,14 +1511,6 @@ function getCurrentSelectedItem() {
   return null;
 }
 
-function rotationPeriodToViewerSpeed(rotationPeriodHours) {
-  const hours = toNumber(rotationPeriodHours, 6);
-  if (!Number.isFinite(hours) || hours <= 0) return 5;
-  const degPerSecond = 360 / (hours * 3600);
-  const amplified = degPerSecond * 1200;
-  return Math.min(30, Math.max(0.3, amplified));
-}
-
 function estimateViewerSpeed(objectData) {
   if (!objectData) return 15;
   const raw = objectData.raw || {};
@@ -1513,9 +1623,6 @@ function updateDatasetRadios(key) {
   datasetMainRadios.forEach((radio) => {
     if (radio.value === key) radio.checked = true;
   });
-  datasetViewerRadios.forEach((radio) => {
-    if (radio.value === key) radio.checked = true;
-  });
 }
 
 function updateObjectSummary(objectData) {
@@ -1577,40 +1684,38 @@ function formatObjectDetails(objectData) {
   return lines.join('\n');
 }
 
+function refreshOrbitDetails(explicitObject = null) {
+  if (!apiAsteroidDetails) return;
+  const targetObject = explicitObject || getCurrentSelectedItem() || currentViewerObject;
+  if (!targetObject) {
+    apiAsteroidDetails.value = translate('message.selectFromCatalog') || 'Selecciona un objeto del catálogo';
+    return;
+  }
+  apiAsteroidDetails.value = formatObjectDetails(targetObject);
+}
+
 function applyObjectToViewer(objectData) {
   if (!objectData) return;
-  const minDiameter = Number(manDiameter ? manDiameter.min : 0.1) || 0.1;
-  const maxDiameter = Number(manDiameter ? manDiameter.max : 1000) || 1000;
-  const diameter = Math.min(Math.max(toNumber(objectData.diameterKm, minDiameter), minDiameter), maxDiameter);
-  if (manDiameter) {
-    manDiameter.value = diameter.toFixed(1);
-    meteoriteState.diameterKM = diameter;
-  }
 
-  const derivedDensity = Number.isFinite(objectData.density) ? objectData.density : seedToDensity(hashStringToSeed(objectData.name));
-  if (manDensity) {
-    manDensity.value = Math.round(derivedDensity);
-  }
-
-  const rotationSliderValue = rotationPeriodToViewerSpeed(objectData.rotation_period);
-  if (manRotation) {
-    const minRot = Number(manRotation.min) || 0;
-    const maxRot = Number(manRotation.max) || 30;
-    manRotation.value = Math.min(Math.max(rotationSliderValue, minRot), maxRot).toFixed(1);
-  }
-
-  if (manSpeed) {
-    const speedValue = Number.isFinite(objectData.velocity)
-      ? objectData.velocity
-      : estimateViewerSpeed(objectData);
-    manSpeed.value = Math.max(0, speedValue).toFixed(1);
-  }
-
-  updateManualDisplay();
+  const diameter = Math.max(0.1, toNumber(objectData.diameterKm, meteoriteState.diameterKM));
+  meteoriteState.diameterKM = diameter;
+  meteoriteState.density = Number.isFinite(objectData.density) ? objectData.density : null;
+  meteoriteState.rotationPeriodHours = Number.isFinite(objectData.rotation_period) ? objectData.rotation_period : null;
+  const velocityValue = Number.isFinite(objectData.velocity)
+    ? objectData.velocity
+    : estimateViewerSpeed(objectData);
+  meteoriteState.velocity = velocityValue;
 
   const seed = Number.isFinite(objectData.seed) ? objectData.seed : hashStringToSeed(objectData.name);
   meteoriteState.seed = seed;
-  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed });
+  currentViewerObject = objectData;
+
+  if (!avRenderer) {
+    initAsteroidViewerThree();
+    resizeAsteroidViewer();
+  }
+
+  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed: meteoriteState.seed });
   updateViewerRotationSpeed();
 }
 
@@ -1618,18 +1723,18 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   if (!Array.isArray(filteredCatalog) || !filteredCatalog[index]) return;
   currentObjectIndex = index;
   const selected = filteredCatalog[index];
+  currentViewerObject = selected;
   currentObjectId = selected?.id || null;
   const previousFlag = suppressDatasetEvents;
   suppressDatasetEvents = true;
   if (objectSelect) objectSelect.value = String(index);
-  if (apiAsteroidSelect) apiAsteroidSelect.value = String(index);
   suppressDatasetEvents = previousFlag;
   updateObjectSummary(selected);
   if (updateViewer) {
     applyObjectToViewer(selected);
   }
-  if (updateDetails && apiAsteroidDetails) {
-    apiAsteroidDetails.value = formatObjectDetails(selected);
+  if (updateDetails) {
+    refreshOrbitDetails(selected);
   }
   if (updateProbability) {
     updateImpactProbabilityForItem(selected, { source: 'active-object' });
@@ -1690,11 +1795,11 @@ function applyFilters({ preserveSelection = false } = {}) {
   filteredCatalog = catalogFull.filter(matchesFilters);
 
   populateObjectSelect();
-  populateApiSelect();
 
   if (!filteredCatalog.length) {
     currentObjectIndex = null;
     currentObjectId = null;
+    currentViewerObject = null;
     updateObjectSummary(null);
     if (apiAsteroidDetails) apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
     updateImpactProbabilityForItem(null, { source: 'filters' });
@@ -1745,8 +1850,9 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   isCatalogLoading = true;
   updateDatasetRadios(key);
   setSelectLoading(objectSelect, 'option.loadingCatalog');
-  setSelectLoading(apiAsteroidSelect, 'option.loadingCatalog');
-  if (apiAsteroidDetails) apiAsteroidDetails.value = '';
+  if (apiAsteroidDetails) {
+    apiAsteroidDetails.value = translate('option.loadingCatalog') || 'Cargando catálogo...';
+  }
 
   try {
     const rawData = await ensureDatabaseLoaded(key);
@@ -1794,25 +1900,6 @@ datasetMainRadios.forEach((radio) => {
   });
 });
 
-datasetViewerRadios.forEach((radio) => {
-  radio.addEventListener('change', () => {
-    if (!radio.checked || suppressDatasetEvents) return;
-    switchDataset(radio.value, { origin: 'viewer', forceReload: true });
-  });
-});
-
-if (document.querySelectorAll('input[name="datasetViewer"]').length > 0) {
-  document.querySelectorAll('input[name="datasetViewer"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-      if (this.value === 'asteroids') {
-        switchDataset('asteroids', { origin: 'viewer', forceReload: false });
-      } else {
-        switchDataset('comets', { origin: 'viewer', forceReload: false });
-      }
-    });
-  });
-}
-
 [
   [filterNameInput, ['input']],
   [filterMinDiameterInput, ['input', 'change']],
@@ -1832,24 +1919,11 @@ switchDataset('asteroids', { origin: 'init', forceReload: true });
 let avRenderer, avScene, avCamera, avAsteroid, avLight;
 let meteoriteState = {
   diameterKM: 50,
-  seed: 42
+  seed: 42,
+  rotationPeriodHours: 6,
+  velocity: null,
+  density: null
 };
-
-function densityToSeed(density) {
-  const min = manDensity ? Number(manDensity.min) || 1 : 1;
-  const max = manDensity ? Number(manDensity.max) || Math.max(min + 1, density) : 8000;
-  const clamped = Math.min(Math.max(density, min), max);
-  const normalized = (clamped - min) / (max - min || 1);
-  return Math.max(1, Math.round(normalized * 999) + 1);
-}
-
-function seedToDensity(seed) {
-  if (!manDensity) return seed;
-  const min = Number(manDensity.min) || 1;
-  const max = Number(manDensity.max) || 8000;
-  const normalized = (Math.max(1, seed) - 1) / 999;
-  return Math.round(min + normalized * (max - min));
-}
 
 function diameterToSceneRadius(diameterKm) {
   const sanitized = Math.max(0.1, Number(diameterKm) || 1);
@@ -1968,6 +2042,7 @@ function disposeMaterial(material) {
 
 function regenerateMeteorite(overrides = {}) {
   meteoriteState = {
+    ...meteoriteState,
     diameterKM: overrides.diameterKM !== undefined ? Number(overrides.diameterKM) : meteoriteState.diameterKM,
     seed: overrides.seed !== undefined ? Number(overrides.seed) : meteoriteState.seed
   };
@@ -1979,16 +2054,18 @@ function regenerateMeteorite(overrides = {}) {
 }
 
 function updateViewerRotationSpeed() {
-  const degPerSec = Number(manRotation ? manRotation.value : 5);
-  const speed = Number(manSpeed ? manSpeed.value : 10);
-  const speedFactor = 0.5 + speed / 60;
-  avRotSpeed = (degPerSec * Math.PI / 180) * 0.016 * speedFactor;
+  const rotationHours = Number.isFinite(meteoriteState.rotationPeriodHours) && meteoriteState.rotationPeriodHours > 0
+    ? meteoriteState.rotationPeriodHours
+    : 6;
+  const radPerSecond = (2 * Math.PI) / (rotationHours * 3600);
+  const velocity = Number.isFinite(meteoriteState.velocity) ? meteoriteState.velocity : 20;
+  const velocityFactor = Math.min(2.5, Math.max(0.5, velocity / 20));
+  const baseScale = 360; // ajusta la velocidad visual del modelo
+  avRotSpeed = radPerSecond * baseScale * velocityFactor;
 }
 
-meteoriteState.diameterKM = manDiameter ? Number(manDiameter.value) : meteoriteState.diameterKM;
-meteoriteState.seed = manDensity ? densityToSeed(Number(manDensity.value)) : meteoriteState.seed;
-
 function initAsteroidViewerThree() {
+  if (!asteroidCanvas) return;
   if (!THREE_NS) {
     asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
@@ -2153,8 +2230,9 @@ function addAsteroidViewerControls() {
     updateCameraPosition();
     
     // Eventos del mouse
-    domElement.addEventListener('mousedown', (event) => {
-        isRotating = true;
+  domElement.addEventListener('mousedown', (event) => {
+    isRotating = true;
+    avDragging = true;
         previousMousePosition = { x: event.clientX, y: event.clientY };
         domElement.style.cursor = 'grabbing';
     });
@@ -2181,15 +2259,49 @@ function addAsteroidViewerControls() {
         previousMousePosition = { x: event.clientX, y: event.clientY };
     });
     
-    domElement.addEventListener('mouseup', () => {
-        isRotating = false;
+  domElement.addEventListener('mouseup', () => {
+    isRotating = false;
+    avDragging = false;
         domElement.style.cursor = 'grab';
     });
     
     domElement.addEventListener('mouseleave', () => {
-        isRotating = false;
+    isRotating = false;
+    avDragging = false;
         domElement.style.cursor = 'grab';
     });
+
+  domElement.addEventListener('touchstart', (event) => {
+    if (event.touches.length !== 1) return;
+    isRotating = true;
+    avDragging = true;
+    const touch = event.touches[0];
+    previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    domElement.style.cursor = 'grabbing';
+  }, { passive: true });
+
+  domElement.addEventListener('touchmove', (event) => {
+    if (!isRotating || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - previousMousePosition.x;
+    const deltaY = touch.clientY - previousMousePosition.y;
+    const sensitivity = 0.01;
+    orbit.theta -= deltaX * sensitivity;
+    orbit.phi -= deltaY * sensitivity;
+    orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi));
+    updateCameraPosition();
+    previousMousePosition = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+
+  const endTouch = () => {
+    if (!isRotating) return;
+    isRotating = false;
+    avDragging = false;
+    domElement.style.cursor = 'grab';
+  };
+
+  domElement.addEventListener('touchend', endTouch, { passive: true });
+  domElement.addEventListener('touchcancel', endTouch, { passive: true });
     
     // Zoom con rueda del mouse
     domElement.addEventListener('wheel', (event) => {
@@ -2208,7 +2320,6 @@ function addAsteroidViewerControls() {
     domElement.style.cursor = 'grab';
 }
 
-let avAutoRotate = true; // rad/frame
 function asteroidViewerAnimate() {
   requestAnimationFrame(asteroidViewerAnimate);
 
@@ -2229,185 +2340,8 @@ function asteroidViewerAnimate() {
 }
 
 
-function updateManualDisplay() {
-  if (manDiameter && manDiameterValue) {
-    manDiameterValue.textContent = `${Number(manDiameter.value).toFixed(1)} km`;
-  }
-  manSpeedValue.textContent = Number(manSpeed.value).toFixed(1);
-  manDensityValue.textContent = `${manDensity.value} kg/m³`;
-  manRotationValue.textContent = `${Number(manRotation.value).toFixed(1)} °/s`;
-}
-[manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && el.addEventListener('input', updateManualDisplay));
-updateManualDisplay();
-
-if (manDiameter) {
-  manDiameter.addEventListener('input', () => {
-    meteoriteState.diameterKM = Number(manDiameter.value);
-    if (viewerMode === 'manual') regenerateMeteorite({ diameterKM: meteoriteState.diameterKM });
-  });
-}
-
-if (manDensity) {
-  manDensity.addEventListener('input', () => {
-    const newSeed = densityToSeed(Number(manDensity.value));
-    meteoriteState.seed = newSeed;
-    if (viewerMode === 'manual') regenerateMeteorite({ seed: newSeed });
-  });
-}
-
-if (manSpeed) {
-  manSpeed.addEventListener('input', () => {
-    if (viewerMode === 'manual') updateViewerRotationSpeed();
-  });
-}
-
-if (manRotation) {
-  manRotation.addEventListener('input', () => {
-    if (viewerMode === 'manual') updateViewerRotationSpeed();
-  });
-}
-
-function populateApiSelect() {
-  if (!apiAsteroidSelect) return;
-  
-  apiAsteroidSelect.innerHTML = '';
-  
-  // Usar el catálogo filtrado actual
-  if (!filteredCatalog || !filteredCatalog.length) {
-    const option = document.createElement('option');
-    option.value = '';
-    option.setAttribute('data-i18n', 'message.noDataAvailable');
-    option.textContent = translate('message.noDataAvailable') || 'No hay datos disponibles';
-    apiAsteroidSelect.appendChild(option);
-    apiAsteroidSelect.disabled = true;
-    return;
-  }
-  
-  filteredCatalog.forEach((item, index) => {
-    const opt = document.createElement('option');
-    opt.value = String(index);
-    
-    // Formato consistente con el panel principal
-    const diameter = Number.isFinite(item.diameterKm) ? `${item.diameterKm.toFixed(1)}` : 'N/D';
-    const velocity = Number.isFinite(item.velocity) ? `${item.velocity.toFixed(1)}` : 'N/D';
-    
-    opt.textContent = `${item.name} — Ø ${diameter} km, v ${velocity} km/s`;
-    apiAsteroidSelect.appendChild(opt);
-  });
-  
-  apiAsteroidSelect.disabled = false;
-  
-  // Seleccionar el objeto actual si existe, de lo contrario el primero
-  let selectedIndex = 0;
-  if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
-    selectedIndex = currentObjectIndex;
-  }
-  
-  apiAsteroidSelect.value = String(selectedIndex);
-  updateApiDetails();
-}
-
-function updateApiDetails() {
-  if (!apiAsteroidSelect || !apiAsteroidDetails) return;
-  
-  const idx = Number(apiAsteroidSelect.value);
-  if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
-    apiAsteroidDetails.value = translate('message.selectFromCatalog') || 'Selecciona un objeto del catálogo';
-    return;
-  }
-  
-  const object = filteredCatalog[idx];
-  if (!object) {
-    apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
-    return;
-  }
-
-  // Usar la función de formato existente
-  apiAsteroidDetails.value = formatObjectDetails(object);
-  
-  // Actualizar el objeto activo globalmente
-  setActiveObjectByIndex(idx, { 
-    updateViewer: true, 
-    updateDetails: false, 
-    updateProbability: true 
-  });
-}
-
-// === FIN DEL REEMPLAZO ===
-
-if (apiAsteroidSelect) {
-  apiAsteroidSelect.addEventListener('change', function() {
-    updateApiDetails();
-    
-    // También actualizar la selección en el panel principal si es necesario
-    const idx = Number(this.value);
-    if (Number.isFinite(idx) && filteredCatalog[idx]) {
-      setActiveObjectByIndex(idx, { 
-        updateViewer: true, 
-        updateDetails: false, 
-        updateProbability: false 
-      });
-    }
-  });
-}
-
-function setViewerMode(mode) {
-  viewerMode = mode;
-  const dict = translations[currentLanguage] || translations.es;
-  if (mode === 'manual') {
-    manualControls.classList.remove('hidden');
-    apiControls.classList.add('hidden');
-    if (modeToggle) modeToggle.textContent = dict['viewer.modeManual'] || 'Modo Manual';
-    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
-    updateViewerRotationSpeed();
-    regenerateMeteorite({
-      diameterKM: Number(manDiameter ? manDiameter.value : meteoriteState.diameterKM),
-      seed: densityToSeed(Number(manDensity ? manDensity.value : meteoriteState.seed))
-    });
-  } else {
-    manualControls.classList.add('hidden');
-    apiControls.classList.remove('hidden');
-    if (modeToggle) modeToggle.textContent = dict['viewer.modeApi'] || 'Modo API';
-    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
-    
-    // Usar el catálogo actual en lugar de datos mock
-    populateApiSelect();
-    
-    // Si hay un objeto seleccionado, cargar sus detalles
-    if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
-      const selectedObject = filteredCatalog[currentObjectIndex];
-      apiAsteroidDetails.value = formatObjectDetails(selectedObject);
-      computeAndDisplayImpactProbability(selectedObject, { source: 'viewer-mode' });
-    }
-  }
-}
-
-modeToggle && modeToggle.addEventListener('click', ()=>{
-  setViewerMode(viewerMode === 'manual' ? 'api' : 'manual');
-});
-
-// Toggle view with the header icon. The icon image swaps between asteroid-icon.png and planet-icon.png
-openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', ()=>{
-  const img = openAsteroidViewerBtn.querySelector('img');
-  const isViewerOpen = !asteroidViewer.classList.contains('hidden');
-  if (isViewerOpen) {
-    // Close viewer -> show simulation
-    asteroidViewer.classList.add('hidden');
-    simLayout.classList.remove('hidden');
-    if (img) img.src = './static/img/asteroid-icon.png';
-  } else {
-    // Open viewer -> hide simulation
-    simLayout.classList.add('hidden');
-    asteroidViewer.classList.remove('hidden');
-    if (img) img.src = './static/img/planet-icon.png';
-    if (!avRenderer) initAsteroidViewerThree();
-    setViewerMode('manual');
-    setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
-  }
-});
-
 function resizeAsteroidViewer() {
-  if (!avRenderer || !avCamera) return;
+  if (!asteroidCanvas || !avRenderer || !avCamera) return;
   const w = asteroidCanvas.clientWidth; const h = asteroidCanvas.clientHeight;
   avRenderer.setSize(w, h);
   avCamera.aspect = Math.max(0.1, w / Math.max(1, h));
@@ -2671,78 +2605,6 @@ document.querySelectorAll('[data-lang-option]').forEach((btn) => {
     closeAccessibilityMenu();
   });
 })();
-
-document.addEventListener('DOMContentLoaded', function() {
-  // Inicializar el select del modo API cuando esté disponible
-  if (apiAsteroidSelect && viewerMode === 'api') {
-    setTimeout(() => {
-      populateApiSelect();
-    }, 100);
-  }
-});
-let craterCircle;
-
-
-
-// Parámetros de inicio
-function updateCraterDisplay() {
-    console.log('=== updateCraterDisplay START ===');
-    
-    // Switch to 2D map view
-    document.getElementById('globe3D').classList.add('hidden');
-    document.getElementById('map2D').classList.remove('hidden');
-    
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 100);
-    
-    if (!impactMarker) {
-        alert('Por favor, haz clic en el mapa para seleccionar un punto de impacto');
-        return;
-    }
-    
-    const L_input = parseFloat(diameterInput.value);
-    const v_i = parseFloat(velocityInput.value) * 1000;
-    
-    // Get density from the input field
-    const phi_i = parseFloat(document.getElementById('density').value);
-    const phi_t = 2000;
-    const theta_deg = parseFloat(document.getElementById('mitigation').value);
-
-    // const theta_rad = (theta_deg * Math.PI) / 180;
-    // const v_i = v_0 * Math.exp(3 / (2 * phi_i * L_input * Math.sin(theta_rad)));
-    
-    console.log('Using density from input:', phi_i);
-    
-    console.log('Input values:', { L_input, v_i, phi_i, phi_t, theta_deg });
-    
-    // Calculate crater
-    const craterData = calculateCraterImpact(phi_i, phi_t, L_input, v_i, theta_deg);
-    
-    console.log('Crater data:', craterData);
-    console.log('D_fr:', craterData.D_fr);
-    
-    // Update results panel
-    document.getElementById('craterType').textContent = craterData.craterType;
-    document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
-    document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
-    document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);
-    document.getElementById('h_fr').textContent = craterData.h_fr > 0 ? craterData.h_fr.toFixed(2) : 'N/A';
-    
-    // Calculate energy
-    const mass = (4/3) * Math.PI * Math.pow(L_input/2, 3) * phi_i;
-    const energy_joules = 0.5 * mass * Math.pow(v_i, 2);
-    const energy_megatons = energy_joules / (4.184e15);
-    document.getElementById('energy').textContent = energy_megatons.toFixed(2);
-    
-    // Calculate crater radius and display on map
-    const craterRadius = craterData.D_fr / 2;
-    console.log('Crater radius (meters):', craterRadius);
-    console.log('Calling updateMapCrater...');
-    
-    updateMapCrater(craterRadius);
-    console.log('=== updateCraterDisplay END ===');
-}
 
 function updateMapCrater(craterRadius) {
     if (craterCircle) {
@@ -3085,8 +2947,8 @@ function visualizeSeismicZones(latlng, mass, velocity) {
 async function updateCraterDisplay() {
   console.log('=== updateCraterDisplay START ===');
   
-  document.getElementById('globe3D').classList.add('hidden');
-  document.getElementById('map2D').classList.remove('hidden');
+  if (globe3DContainer) globe3DContainer.classList.add('hidden');
+  if (map2D) map2D.classList.remove('hidden');
   
   setTimeout(() => {
     map.invalidateSize();
@@ -3110,6 +2972,7 @@ async function updateCraterDisplay() {
   
   // Update results panel
   document.getElementById('craterType').textContent = craterData.craterType;
+  updateCraterImageDisplay(craterData.craterType);
   document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
   document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
   document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);

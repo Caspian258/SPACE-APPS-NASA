@@ -13,200 +13,146 @@
   <header>
     <h1 data-i18n="title">Asteroid Impact Simulator</h1>
     <p data-i18n="subtitle">Explora el impacto de asteroides y estrategias de mitigación.</p>
-    <!-- Botón (imagen) para abrir el Visor de Asteroides -->
-    <button id="openAsteroidViewerBtn" class="icon-button" title="Abrir visor de asteroides">
-      <img src="./static/img/asteroid-icon.png" alt="Abrir visor de asteroides" />
-    </button>
   </header>
 
-  <main id="simLayout" class="layout">
-    <!-- Control Panel -->
-    <section class="panel control">
-      <h2 data-i18n="controlPanelHeading">Panel de Control</h2>
-      <div class="control-group">
-        <label for="diameter"><span data-i18n="label.diameter">Diámetro del Asteroide (m)</span></label>
-        <input type="range" id="diameter" min="10" max="1000" step="1" value="100" />
-        <div class="value" id="diameterValue">100 m</div>
-      </div>
-      <div class="control-group">
-        <label for="velocity"><span data-i18n="label.velocity">Velocidad del Asteroide (km/s)</span></label>
-        <input type="range" id="velocity" min="10" max="70" step="0.1" value="20" />
-        <div class="value" id="velocityValue">20.0 km/s</div>
-      </div>
-      <div class="control-group">
-        <label for="density"><span data-i18n="label.density">Densidad (kg/m³)</span></label>
-        <input type="number" id="density" min="500" max="8000" step="100" value="3000" />
-      </div>
+  <main id="simLayout">
+    <div class="mode-switch" role="radiogroup" data-i18n-aria-label="mode.primaryAria">
+      <label class="mode-option">
+        <input type="radio" name="primaryMode" id="primaryModeImpact" value="impact" aria-controls="impactModeContainer" checked />
+        <span id="primaryModeImpactLabel" data-i18n="mode.impact">Simulación de Impacto</span>
+      </label>
+      <label class="mode-option">
+        <input type="radio" name="primaryMode" id="primaryModeOrbit" value="orbit" aria-controls="orbitModeContainer" />
+        <span id="primaryModeOrbitLabel" data-i18n="mode.orbit">Simulación de Órbita</span>
+      </label>
+    </div>
 
-      <div class="control-group">
-        <label for="mitigation">
-          <span data-i18n="label.mitigation">Ángulo de impacto (°)</span>
-        <input type="range" id="mitigation" min="30" max="90" step="1" value="30" />
-        <div class="value" id="mitigationValue">0°</div>
-      </div>
+    <div id="impactModeContainer" class="mode-container layout" role="region" aria-labelledby="primaryModeImpactLabel">
+      <!-- Control Panel -->
+      <section class="panel control">
+        <h2 data-i18n="controlPanelHeading">Panel de Control</h2>
+        <div class="control-group orbit-mode-hide">
+          <label for="diameter"><span data-i18n="label.diameter">Diámetro del Asteroide (m)</span></label>
+          <input type="range" id="diameter" min="10" max="1000" step="1" value="100" />
+          <div class="value" id="diameterValue">100 m</div>
+        </div>
+        <div class="control-group orbit-mode-hide">
+          <label for="velocity"><span data-i18n="label.velocity">Velocidad del Asteroide (km/s)</span></label>
+          <input type="range" id="velocity" min="10" max="70" step="0.1" value="20" />
+          <div class="value" id="velocityValue">20.0 km/s</div>
+        </div>
+        <div class="control-group orbit-mode-hide">
+          <label for="density"><span data-i18n="label.density">Densidad (kg/m³)</span></label>
+          <input type="number" id="density" min="500" max="8000" step="100" value="3000" />
+        </div>
 
-      <div class="control-group">
-        <label><span data-i18n="label.selectImpact">Selecciona el punto de impacto</span></label>
-        <div id="selectMap" class="map-select"></div>
-        <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
-      </div>
-
-  <button id="simulateBtn" class="simulate" data-i18n="button.simulate">¡Simular Impacto!</button>
-
-
-      <div class="toggle-views">
-        <button id="show3D" data-i18n="button.view3D">Ver Globo 3D</button>
-        <button id="show2D" data-i18n="button.view2D">Ver Mapa 2D</button>
-      </div>
-
-      <div class="control-group" style="margin-top:12px;">
-        <label><span data-i18n="label.catalogHeading">Catálogo de objetos</span></label>
-        <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="asteroids" checked /> <span data-i18n="radio.asteroids">Asteroides</span>
+        <div class="control-group orbit-mode-hide">
+          <label for="mitigation">
+            <span data-i18n="label.mitigation">Ángulo de impacto (°)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="comets" /> <span data-i18n="radio.comets">Cometas</span>
-          </label>
+          <input type="range" id="mitigation" min="30" max="90" step="1" value="30" />
+          <div class="value" id="mitigationValue">0°</div>
         </div>
-      </div>
 
-      <div class="control-group">
-        <label for="objectSelect"><span data-i18n="label.selectObject">Seleccionar objeto</span></label>
-        <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-          <option value="" data-i18n="option.loadingCatalog">Cargando catálogo...</option>
-        </select>
-        <div class="value small" id="objectSummary">--</div>
-      </div>
-
-      <div class="control-group" style="margin-top:12px;">
-        <label for="filterName"><span data-i18n="label.filterName">Buscar por nombre</span></label>
-        <input type="text" id="filterName" placeholder="Ej: Apophis" data-i18n-placeholder="placeholder.filterName" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-      </div>
-
-      <div class="control-group" style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div>
-          <label for="filterMinDiameter"><span data-i18n="label.filterMinDiameter">Diámetro mínimo (km)</span></label>
-          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+        <div class="control-group orbit-mode-hide">
+          <label><span data-i18n="label.selectImpact">Selecciona el punto de impacto</span></label>
+          <div id="selectMap" class="map-select"></div>
+          <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
         </div>
-        <div>
-          <label for="filterMinVelocity"><span data-i18n="label.filterMinVelocity">Velocidad mínima (km/s)</span></label>
-          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+
+        <button id="simulateBtn" class="simulate orbit-mode-hide" data-i18n="button.simulate">¡Simular Impacto!</button>
+
+        <div class="control-group" style="margin-top:12px;">
+          <label><span data-i18n="label.catalogHeading">Catálogo de objetos</span></label>
+          <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="datasetMain" value="asteroids" checked /> <span data-i18n="radio.asteroids">Asteroides</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="datasetMain" value="comets" /> <span data-i18n="radio.comets">Cometas</span>
+            </label>
+          </div>
         </div>
-      </div>
 
-      <div class="control-group" style="margin-top:6px;">
-        <label><span data-i18n="label.discoveryRange">Rango de fechas de descubrimiento</span></label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="date" id="filterDateStart" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-          <input type="date" id="filterDateEnd" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+        <div class="control-group">
+          <label for="objectSelect"><span data-i18n="label.selectObject">Seleccionar objeto</span></label>
+          <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+            <option value="" data-i18n="option.loadingCatalog">Cargando catálogo...</option>
+          </select>
+          <div class="value small" id="objectSummary">--</div>
         </div>
-      </div>
-      <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;" data-i18n="button.calculateProbability">Calcular Probabilidad de Impacto</button>
-    </section>
 
-    <!-- Visualization -->
-    <section class="panel visualize">
-      <div id="globe3D" class="viz"></div>
-      <div id="map2D" class="viz hidden"></div>
-    </section>
-
-    <!-- Results Panel -->
-    <section class="panel results">
-      <h2 data-i18n="resultsHeading">Resultados</h2>
-      <ul class="results-list">
-        <li><strong data-i18n="results.energy">Energía de Impacto:</strong> <span id="energy">--</span> <span data-i18n="units.megatons">Megatones</span></li>
-        <li><strong data-i18n="results.craterType">Tipo de cráter:</strong> <span class="value" id="craterType">--</span></li>
-        <li><strong data-i18n="results.initialDiameter">Diámetro inicial:</strong> <span class="value" id="D_tc">--</span> <span data-i18n="units.meters">m</span></li>
-        <li><strong data-i18n="results.finalDiameter">Diámetro final:</strong> <span class="value" id="D_fr">--</span> <span data-i18n="units.meters">m</span></li>
-        <li><strong data-i18n="results.finalDepth">Profundidad final:</strong> <span class="value" id="d_fr">--</span> <span data-i18n="units.meters">m</span></li>
-        <li><strong data-i18n="results.rimHeight">Altura de cresta:</strong> <span class="value" id="h_fr">--</span> <span data-i18n="units.meters">m</span></li>
-        <li><strong data-i18n="results.probability">Probabilidad de Impacto por Órbita:</strong> <span id="probability-result">--</span></li>
-      </ul>
-
-      <div class="neo-picker hidden" id="neoPicker">
-        <h3 data-i18n="neo.heading">Selecciona un NEO</h3>
-        <div class="value small" data-i18n="neo.source">Fuente: NASA NeoWs (demo)</div>
-        <select id="neoSelect" style="width:100%;margin:8px 0;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
-        <div class="value small" id="neoDetails">--</div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="applyNeo" class="simulate" style="flex:1;background:#2a7de1" data-i18n="button.apply">Aplicar</button>
-          <button id="closeNeo" class="simulate" style="flex:1;background:#444e5f" data-i18n="button.close">Cerrar</button>
+        <div class="control-group" style="margin-top:12px;">
+          <label for="filterName"><span data-i18n="label.filterName">Buscar por nombre</span></label>
+          <input type="text" id="filterName" placeholder="Ej: Apophis" data-i18n-placeholder="placeholder.filterName" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
+
+        <div class="control-group" style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label for="filterMinDiameter"><span data-i18n="label.filterMinDiameter">Diámetro mínimo (km)</span></label>
+            <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          </div>
+          <div>
+            <label for="filterMinVelocity"><span data-i18n="label.filterMinVelocity">Velocidad mínima (km/s)</span></label>
+            <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          </div>
+        </div>
+
+        <div class="control-group" style="margin-top:6px;">
+          <label><span data-i18n="label.discoveryRange">Rango de fechas de descubrimiento</span></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="date" id="filterDateStart" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+            <input type="date" id="filterDateEnd" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          </div>
+        </div>
+        <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;" data-i18n="button.calculateProbability">Calcular Probabilidad de Impacto</button>
+      </section>
+
+      <!-- Visualization -->
+      <section class="panel visualize">
+        <div id="globe3D" class="viz"></div>
+        <div id="map2D" class="viz hidden"></div>
+      </section>
+
+      <!-- Results Panel -->
+      <section class="panel results">
+        <h2 data-i18n="resultsHeading">Resultados</h2>
+        <ul class="results-list impact-results orbit-mode-hide">
+          <li><strong data-i18n="results.energy">Energía de Impacto:</strong> <span id="energy">--</span> <span data-i18n="units.megatons">Megatones</span></li>
+          <li><strong data-i18n="results.craterType">Tipo de cráter:</strong> <span class="value" id="craterType">--</span></li>
+          <li><strong data-i18n="results.initialDiameter">Diámetro inicial:</strong> <span class="value" id="D_tc">--</span> <span data-i18n="units.meters">m</span></li>
+          <li><strong data-i18n="results.finalDiameter">Diámetro final:</strong> <span class="value" id="D_fr">--</span> <span data-i18n="units.meters">m</span></li>
+          <li><strong data-i18n="results.finalDepth">Profundidad final:</strong> <span class="value" id="d_fr">--</span> <span data-i18n="units.meters">m</span></li>
+          <li><strong data-i18n="results.rimHeight">Altura de cresta:</strong> <span class="value" id="h_fr">--</span> <span data-i18n="units.meters">m</span></li>
+        </ul>
+
+        <div id="craterImageWrapper" class="crater-image-wrapper hidden orbit-mode-hide">
+          <img id="crater-image" alt="Representación del cráter" />
+        </div>
+
+        <div class="orbit-side-panel orbit-mode-only">
+          <div class="orbit-probability" id="orbitProbability">
+            <strong data-i18n="results.probability">Probabilidad de Impacto por Órbita:</strong>
+            <span id="probability-result">--</span>
+          </div>
+          <div class="orbit-viewer-card">
+            <div id="asteroidCanvas" class="orbit-viewer-canvas"></div>
+          </div>
+          <div class="orbit-details">
+            <label for="apiAsteroidDetails" data-i18n="viewer.api.detailsLabel">Detalles</label>
+            <textarea id="apiAsteroidDetails" rows="8" readonly></textarea>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="orbitModeContainer" class="mode-container orbit-mode-only" role="region" aria-labelledby="primaryModeOrbitLabel">
+      <div class="orbit-placeholder">
+        <h2 data-i18n="orbit.placeholderTitle">Simulación de Órbita</h2>
+        <p data-i18n="orbit.placeholderDescription">Interactúa con la vista 3D para seguir la órbita seleccionada y revisa los detalles del objeto en el panel derecho.</p>
       </div>
-    </section>
+    </div>
   </main>
-
-  <!-- Visor de Asteroides (oculto por defecto) -->
-  <div id="asteroidViewer" class="viewer hidden">
-    <div class="viewer-header">
-      <h2 data-i18n="viewer.heading">Visor de Asteroides</h2>
-    </div>
-    <div class="viewer-grid">
-      <!-- Columna Izquierda: Controles e Información -->
-      <div class="viewer-left">
-        <div class="control-group" style="margin-top:0;">
-          <label for="modeToggle"><span data-i18n="viewer.modeLabel">Modo</span></label>
-          <button id="modeToggle" class="toggle" data-i18n="viewer.modeManual">Modo Manual</button>
-          <div class="value small" data-i18n="viewer.modeHint">Pulsa para alternar entre Manual y API</div>
-        </div>
-
-        <!-- Controles: Modo Manual -->
-        <div id="manualControls">
-          <div class="control-group">
-            <label for="manDiameter"><span data-i18n="viewer.manual.diameter">Diámetro (km)</span></label>
-            <input type="range" id="manDiameter" min="0.1" max="1000" step="0.1" value="50" />
-            <div class="value" id="manDiameterValue">50.0 km</div>
-          </div>
-          <div class="control-group">
-            <label for="manSpeed"><span data-i18n="viewer.manual.speed">Velocidad (unid.)</span></label>
-            <input type="range" id="manSpeed" min="0" max="60" step="0.1" value="10" />
-            <div class="value" id="manSpeedValue">10.0</div>
-          </div>
-          <div class="control-group">
-            <label for="manDensity"><span data-i18n="viewer.manual.density">Densidad (kg/m³)</span></label>
-            <input type="range" id="manDensity" min="500" max="8000" step="100" value="3000" />
-            <div class="value" id="manDensityValue">3000 kg/m³</div>
-          </div>
-          <div class="control-group">
-            <label for="manRotation"><span data-i18n="viewer.manual.rotation">Rotación (°/s)</span></label>
-            <input type="range" id="manRotation" min="0" max="30" step="0.1" value="5" />
-            <div class="value" id="manRotationValue">5.0 °/s</div>
-          </div>
-        </div>
-
-        <div id="apiControls" class="hidden">
-          <div class="control-group">
-            <label><span data-i18n="viewer.api.sourceLabel">Fuente de datos</span></label>
-            <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="asteroids" checked /> <span data-i18n="radio.asteroids">Asteroides</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="comets" /> <span data-i18n="radio.comets">Cometas</span>
-              </label>
-            </div>
-          </div>
-          <div class="control-group">
-            <label for="apiAsteroidSelect"><span data-i18n="viewer.api.listLabel">Lista de asteroides (catálogo)</span></label>
-            <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-              <option value="" data-i18n="option.loadingCatalog">Cargando catálogo...</option>
-            </select>
-            <div class="value small" id="objectSummary">--</div>
-          </div>
-          <div class="control-group">
-            <label for="apiAsteroidDetails"><span data-i18n="viewer.api.detailsLabel">Detalles</span></label>
-            <textarea id="apiAsteroidDetails" rows="6" readonly style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;resize:vertical;"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Columna Derecha: Visualización 3D -->
-      <div class="viewer-right">
-        <div id="asteroidCanvas" class="viz"></div>
-      </div>
-    </div>
-  </div>
 
   <footer>
     <small data-i18n="footer.disclaimer">Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
