@@ -666,18 +666,31 @@ function initThree() {
 
 
 // --- Crear la órbita de un asteroide o cometa ---
-
 let currentOrbitLine = null;
+let orbitalMeteorite = null;
+let orbitalAnimationId = null;
+let orbitalTime = 0;
 
 function createOrbitFromElements(objectData) {
-
+    // Limpiar órbitas y meteoritos anteriores
     if (currentOrbitLine) {
         solarSystemGroup.remove(currentOrbitLine);
         currentOrbitLine.geometry.dispose();
         currentOrbitLine.material.dispose();
-        currentOrbitLine = null
+        currentOrbitLine = null;
     }
-
+    
+    if (orbitalMeteorite) {
+        solarSystemGroup.remove(orbitalMeteorite);
+        orbitalMeteorite.geometry.dispose();
+        orbitalMeteorite.material.dispose();
+        orbitalMeteorite = null;
+    }
+    
+    if (orbitalAnimationId) {
+        cancelAnimationFrame(orbitalAnimationId);
+        orbitalAnimationId = null;
+    }
 
     if (!objectData || !objectData.a || !objectData.e) {
         console.warn('❌ No hay datos suficientes para crear órbita.');
@@ -718,24 +731,78 @@ function createOrbitFromElements(objectData) {
 
     orbitLine.applyMatrix4(orbitMatrix);
 
-    // Escalar a una distancia visible (si tus unidades no están en UA reales)
-    const AU_SCALE = 3; // opcional: escalar visualmente
+    // Escalar a una distancia visible
+    const AU_SCALE = 3;
     orbitLine.scale.set(AU_SCALE, AU_SCALE, AU_SCALE);
 
-    // Agregar al sistema solar
+    // Agregar la órbita al sistema solar
     currentOrbitLine = orbitLine;
     solarSystemGroup.add(orbitLine);
-      // 🪨 Crear el asteroide (pequeña esfera)
+
+    // 🪨 Crear el meteorito (pequeña esfera) y animarlo en la órbita
     const asteroidGeometry = new THREE.SphereGeometry(0.03, 16, 16);
     const asteroidMaterial = new THREE.MeshStandardMaterial({
         color: 0xff4500, // naranja/rojo
         emissive: 0xff4500,
         emissiveIntensity: 0.4
     });
-    const asteroidMesh = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
-    solarSystemGroup.add(asteroidMesh);
+    orbitalMeteorite = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+    solarSystemGroup.add(orbitalMeteorite);
 
-    console.log(`🌀 Órbita añadida para ${objectData.name}`);
+    // Función para calcular la posición en la órbita en función del tiempo
+    function calculateOrbitalPosition(time) {
+        // Calcular la anomalía media (simulando movimiento orbital)
+        const meanAnomaly = (time * 0.5) % (2 * Math.PI);
+        
+        // Resolver la ecuación de Kepler para la anomalía excéntrica (aproximación simple)
+        let eccentricAnomaly = meanAnomaly;
+        for (let j = 0; j < 3; j++) {
+            eccentricAnomaly = meanAnomaly + e * Math.sin(eccentricAnomaly);
+        }
+        
+        // Calcular la anomalía verdadera
+        const trueAnomaly = 2 * Math.atan2(
+            Math.sqrt(1 + e) * Math.sin(eccentricAnomaly / 2),
+            Math.sqrt(1 - e) * Math.cos(eccentricAnomaly / 2)
+        );
+        
+        // Calcular la distancia radial
+        const r = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
+        
+        // Posición en el plano orbital
+        const x = r * Math.cos(trueAnomaly);
+        const y = r * Math.sin(trueAnomaly);
+        
+        return new THREE.Vector3(x, y, 0);
+    }
+
+    // Función de animación del meteorito orbital
+    function animateOrbitalMeteorite() {
+        if (!orbitalMeteorite) return;
+        
+        orbitalTime += 0.016; // Aproximadamente 60 FPS
+        
+        // Calcular posición orbital
+        const orbitalPos = calculateOrbitalPosition(orbitalTime);
+        
+        // Aplicar las mismas transformaciones orbitales que a la línea
+        orbitalPos.applyMatrix4(orbitMatrix);
+        orbitalPos.multiplyScalar(AU_SCALE);
+        
+        // Actualizar posición del meteorito
+        orbitalMeteorite.position.copy(orbitalPos);
+        
+        // Rotación del meteorito sobre su eje
+        orbitalMeteorite.rotation.x += 0.01;
+        orbitalMeteorite.rotation.y += 0.02;
+        
+        orbitalAnimationId = requestAnimationFrame(animateOrbitalMeteorite);
+    }
+
+    // Iniciar animación
+    animateOrbitalMeteorite();
+
+    console.log(`🌀 Órbita y meteorito añadidos para ${objectData.name}`);
     return orbitLine;
 }
 
