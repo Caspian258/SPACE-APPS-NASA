@@ -35,19 +35,6 @@ const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
 
-const loadNeoBtn = document.getElementById('loadNeoBtn');
-const neoPicker = document.getElementById('neoPicker');
-const neoSelect = document.getElementById('neoSelect');
-const neoDetails = document.getElementById('neoDetails');
-const applyNeo = document.getElementById('applyNeo');
-const closeNeo = document.getElementById('closeNeo');
-const neoStart = document.getElementById('neoStart');
-const neoEnd = document.getElementById('neoEnd');
-const neoMinDiameter = document.getElementById('neoMinDiameter');
-const neoHistoryEl = document.getElementById('neoHistory');
-const neoMinVel = document.getElementById('neoMinVel');
-const neoMaxVel = document.getElementById('neoMaxVel');
-const neoSearch = document.getElementById('neoSearch');
 
 // Vistas
 const show3D = document.getElementById('show3D');
@@ -58,6 +45,11 @@ const objectSelect = document.getElementById('objectSelect');
 const objectSummary = document.getElementById('objectSummary');
 const datasetMainRadios = document.querySelectorAll('input[name="datasetMain"]');
 const datasetViewerRadios = document.querySelectorAll('input[name="datasetViewer"]');
+const filterNameInput = document.getElementById('filterName');
+const filterMinDiameterInput = document.getElementById('filterMinDiameter');
+const filterMinVelocityInput = document.getElementById('filterMinVelocity');
+const filterDateStartInput = document.getElementById('filterDateStart');
+const filterDateEndInput = document.getElementById('filterDateEnd');
 
 // Visor de Asteroides UI refs
 const simLayout = document.getElementById('simLayout');
@@ -136,15 +128,6 @@ fetch('static/data/population_density.json').then(r=>r.json()).then(pop=>{
     return L.circle([lat, lon], { radius, color: '#6bc3ff', weight: 1, fillOpacity: 0.15 });
   })).addTo(map);
 }).catch(()=>{});
-
-document.getElementById('toggleSeismic').addEventListener('change', (e)=>{
-  if (!seismicLayer) return;
-  if (e.target.checked) map.addLayer(seismicLayer); else map.removeLayer(seismicLayer);
-});
-document.getElementById('togglePopulation').addEventListener('change', (e)=>{
-  if (!populationLayer) return;
-  if (e.target.checked) map.addLayer(populationLayer); else map.removeLayer(populationLayer);
-});
 
 // Vistas 2D/3D
 show3D.addEventListener('click', () => { globe3D.classList.remove('hidden'); map2D.classList.add('hidden'); onResize(); });
@@ -348,64 +331,6 @@ function runSimulationTemplate({ diameter, velocity, density, impactLat, impactL
 
 // TODO: Integración NeoWs (opcional en hackathon)
 // En la versión hackathon no llamamos a la API de NASA. Puedes cargar un JSON local o mock.
-let cachedNEOs = [];
-let filteredNEOs = [];
-function applyNeoFilters() {
-  const minD = Number(neoMinDiameter.value || 0);
-  const minV = neoMinVel.value === '' ? null : Number(neoMinVel.value);
-  const maxV = neoMaxVel.value === '' ? null : Number(neoMaxVel.value);
-  const q = (neoSearch.value || '').trim().toLowerCase();
-  filteredNEOs = (cachedNEOs || []).filter(n => {
-    if (!isNaN(minD) && n.diameter_m < minD) return false;
-    if (minV !== null && !isNaN(minV) && n.velocity_kms < minV) return false;
-    if (maxV !== null && !isNaN(maxV) && n.velocity_kms > maxV) return false;
-    if (q && !(n.name || '').toLowerCase().includes(q)) return false;
-    return true;
-  });
-  populateNeoSelect();
-}
-function populateNeoSelect() {
-  neoSelect.innerHTML = '';
-  filteredNEOs.forEach((neo, i) => {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = `${neo.name} — Ø ${neo.diameter_m} m, v ${neo.velocity_kms} km/s`;
-    neoSelect.appendChild(opt);
-  });
-  updateNeoDetails();
-}
-function updateNeoDetails() {
-  const idx = Number(neoSelect.value || 0);
-  const neo = filteredNEOs[idx];
-  neoDetails.textContent = neo ? `Nombre: ${neo.name} | Diámetro: ${neo.diameter_m} m | Velocidad: ${neo.velocity_kms} km/s` : '--';
-}
-neoSelect.addEventListener('change', updateNeoDetails);
-
-loadNeoBtn.addEventListener('click', async () => {
-  // TODO: Cargar NEOs desde un JSON local o definir un mock aquí
-  cachedNEOs = [
-    { name: 'Demo NEO 1', diameter_m: 350, velocity_kms: 18.2 },
-    { name: 'Demo NEO 2', diameter_m: 120, velocity_kms: 12.5 },
-    { name: 'Demo NEO 3', diameter_m: 850, velocity_kms: 22.1 },
-  ];
-  applyNeoFilters();
-  neoPicker.classList.remove('hidden');
-});
-applyNeo.addEventListener('click', () => {
-  const idx = Number(neoSelect.value || 0);
-  const neo = filteredNEOs[idx];
-  if (!neo) return;
-  const d = Math.max(10, Math.min(1000, neo.diameter_m));
-  const v = Math.max(10, Math.min(70, neo.velocity_kms));
-  diameterInput.value = d.toFixed(0);
-  velocityInput.value = v.toFixed(1);
-  updateSliderDisplays();
-  neoPicker.classList.add('hidden');
-});
-closeNeo.addEventListener('click', () => neoPicker.classList.add('hidden'));
-[neoMinDiameter, neoMinVel, neoMaxVel, neoSearch].forEach(el => el.addEventListener('input', () => {
-  if (cachedNEOs.length) applyNeoFilters();
-}));
 
 // Dibujo de zonas
 function drawEffectZones(lat, lon, craterKm, zones) {
@@ -548,17 +473,17 @@ initThree();
 let viewerMode = 'manual'; // 'manual' | 'api'
 
 const FALLBACK_ASTEROIDS = [
-  { full_name: 'Asteroide Bennu (Ejemplo)', diameter: 0.49, velocity: 28.0, density: 1260, rotation_period: 4.3, seed: 101, a: 1.126, e: 0.204, i: 6.035, om: 2.1, w: 66.1, ma: 10.4 },
-  { full_name: 'Asteroide Apophis (Ejemplo)', diameter: 0.37, velocity: 30.7, density: 3260, rotation_period: 30.6, seed: 256, a: 0.922, e: 0.191, i: 3.331, om: 204.4, w: 130.5, ma: 25.7 },
-  { full_name: 'Planetoide Ceres (Grande)', diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1, seed: 512, a: 2.77, e: 0.08, i: 10.59, om: 80.3, w: 73.6, ma: 48.2 },
-  { full_name: 'Asteroide Vesta', diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3, seed: 768, a: 2.36, e: 0.089, i: 7.14, om: 103.9, w: 150.1, ma: 78.4 },
-  { full_name: 'Asteroide Hygiea', diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8, seed: 903, a: 3.14, e: 0.119, i: 3.83, om: 281.2, w: 312.4, ma: 6.8 }
+  { full_name: 'Asteroide Bennu (Ejemplo)', diameter: 0.49, velocity: 28.0, density: 1260, rotation_period: 4.3, seed: 101, a: 1.126, e: 0.204, i: 6.035, om: 2.1, w: 66.1, ma: 10.4, discovery_date: '1999-09-11' },
+  { full_name: 'Asteroide Apophis (Ejemplo)', diameter: 0.37, velocity: 30.7, density: 3260, rotation_period: 30.6, seed: 256, a: 0.922, e: 0.191, i: 3.331, om: 204.4, w: 130.5, ma: 25.7, discovery_date: '2004-06-19' },
+  { full_name: 'Planetoide Ceres (Grande)', diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1, seed: 512, a: 2.77, e: 0.08, i: 10.59, om: 80.3, w: 73.6, ma: 48.2, discovery_date: '1801-01-01' },
+  { full_name: 'Asteroide Vesta', diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3, seed: 768, a: 2.36, e: 0.089, i: 7.14, om: 103.9, w: 150.1, ma: 78.4, discovery_date: '1807-03-29' },
+  { full_name: 'Asteroide Hygiea', diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8, seed: 903, a: 3.14, e: 0.119, i: 3.83, om: 281.2, w: 312.4, ma: 6.8, discovery_date: '1849-04-12' }
 ];
 
 const FALLBACK_COMETS = [
-  { object_name: '1P/Halley', e: '0.967', q_au_1: '0.586', q_au_2: '35.08', i_deg: '162.26', node_deg: '58.42', w_deg: '111.33', p_yr: '75.32', moid_au: '0.063' },
-  { object_name: '2P/Encke', e: '0.848', q_au_1: '0.336', q_au_2: '4.09', i_deg: '11.78', node_deg: '334.57', w_deg: '186.54', p_yr: '3.30', moid_au: '0.173' },
-  { object_name: '67P/Churyumov-Gerasimenko', e: '0.641', q_au_1: '1.243', q_au_2: '5.68', i_deg: '7.04', node_deg: '50.14', w_deg: '12.79', p_yr: '6.44', moid_au: '0.257' }
+  { object_name: '1P/Halley', e: '0.967', q_au_1: '0.586', q_au_2: '35.08', i_deg: '162.26', node_deg: '58.42', w_deg: '111.33', p_yr: '75.32', moid_au: '0.063', velocity_kms: '54.0', discovery_date: '0240-05-25' },
+  { object_name: '2P/Encke', e: '0.848', q_au_1: '0.336', q_au_2: '4.09', i_deg: '11.78', node_deg: '334.57', w_deg: '186.54', p_yr: '3.30', moid_au: '0.173', velocity_kms: '34.0', discovery_date: '1786-01-17' },
+  { object_name: '67P/Churyumov-Gerasimenko', e: '0.641', q_au_1: '1.243', q_au_2: '5.68', i_deg: '7.04', node_deg: '50.14', w_deg: '12.79', p_yr: '6.44', moid_au: '0.257', velocity_kms: '32.9', discovery_date: '1969-09-20' }
 ];
 
 const DATA_SOURCES = {
@@ -567,8 +492,10 @@ const DATA_SOURCES = {
 };
 
 let currentDatasetKey = 'asteroids';
-let catalog = [];
+let catalogFull = [];
+let filteredCatalog = [];
 let currentObjectIndex = null;
+let currentObjectId = null;
 let isCatalogLoading = false;
 let suppressDatasetEvents = false;
 
@@ -597,7 +524,7 @@ function rotationPeriodToViewerSpeed(rotationPeriodHours) {
 function estimateViewerSpeed(objectData) {
   if (!objectData) return 15;
   const raw = objectData.raw || {};
-  const direct = toNumber(raw.velocity_kms) || toNumber(raw.velocity) || toNumber(raw.v_infinity);
+  const direct = toNumber(objectData.velocity) || toNumber(raw.velocity_kms) || toNumber(raw.velocity) || toNumber(raw.v_infinity);
   if (Number.isFinite(direct)) return Math.max(0, Math.min(60, direct));
   if (objectData.type === 'comet') return 45;
   return 20;
@@ -620,6 +547,12 @@ function normalizeAsteroidRecord(record, index = 0) {
 
   const density = toNumber(record.density, 2500 + (hashStringToSeed(name) % 1500));
   const rotation = toNumber(record.rotation_period, 6 + ((hashStringToSeed(name) % 80) / 10));
+  const velocityCandidate = toNumber(record.velocity,
+    toNumber(record.velocity_kms,
+      toNumber(record.velocity_km_s,
+        toNumber(record.rel_velocity))));
+  const velocity = Number.isFinite(velocityCandidate) ? velocityCandidate : null;
+  const discoveryDate = record.discovery_date || record.discoveryDate || record.disc_date || record.discovered || null;
 
   return {
     id: `ast-${index}`,
@@ -635,6 +568,8 @@ function normalizeAsteroidRecord(record, index = 0) {
     omega: ascendingNode,
     argPeriapsis,
     meanAnomaly,
+    velocity,
+    discoveryDate,
     raw: record
   };
 }
@@ -654,6 +589,12 @@ function normalizeCometRecord(record, index = 0) {
   const diameterKm = Math.max(0.5, moid * 150);
   const density = toNumber(record.density, 600 + (hashStringToSeed(name) % 200));
   const rotation = period > 0 ? Math.min(48, period * 2) : 12;
+  const velocityCandidate = toNumber(record.velocity,
+    toNumber(record.velocity_kms,
+      toNumber(record.v_inf,
+        toNumber(record.v_infinity))));
+  const velocity = Number.isFinite(velocityCandidate) ? velocityCandidate : null;
+  const discoveryDate = record.discovery_date || record.discoveryDate || record.disc_date || null;
 
   return {
     id: `com-${index}`,
@@ -669,6 +610,8 @@ function normalizeCometRecord(record, index = 0) {
     omega: ascendingNode,
     argPeriapsis,
     meanAnomaly: 0,
+    velocity,
+    discoveryDate,
     raw: record
   };
 }
@@ -707,20 +650,21 @@ function updateObjectSummary(objectData) {
 
 function populateObjectSelect() {
   if (!objectSelect) return;
+  suppressDatasetEvents = true;
   objectSelect.innerHTML = '';
-  if (!catalog.length) {
+  if (!filteredCatalog.length) {
     setSelectLoading(objectSelect, 'Sin datos disponibles');
+    suppressDatasetEvents = false;
     return;
   }
-  catalog.forEach((item, index) => {
+  filteredCatalog.forEach((item, index) => {
     const option = document.createElement('option');
     option.value = String(index);
     option.textContent = item.name;
     objectSelect.appendChild(option);
   });
   objectSelect.disabled = false;
-  const indexToSelect = currentObjectIndex !== null ? currentObjectIndex : 0;
-  objectSelect.value = String(indexToSelect);
+  suppressDatasetEvents = false;
 }
 
 function formatObjectDetails(objectData) {
@@ -731,6 +675,7 @@ function formatObjectDetails(objectData) {
   if (Number.isFinite(objectData.diameterKm)) lines.push(`Diámetro estimado: ${objectData.diameterKm.toFixed(2)} km`);
   if (Number.isFinite(objectData.density)) lines.push(`Densidad modelo: ${Math.round(objectData.density)} kg/m³`);
   if (Number.isFinite(objectData.rotation_period)) lines.push(`Periodo de rotación aprox.: ${objectData.rotation_period.toFixed(1)} h`);
+  if (Number.isFinite(objectData.velocity)) lines.push(`Velocidad estimada: ${objectData.velocity.toFixed(1)} km/s`);
   if (Number.isFinite(objectData.a)) lines.push(`Semieje mayor (a): ${objectData.a.toFixed(3)} UA`);
   if (Number.isFinite(objectData.e)) lines.push(`Excentricidad (e): ${objectData.e.toFixed(3)}`);
   if (Number.isFinite(objectData.i)) lines.push(`Inclinación (i): ${objectData.i.toFixed(2)}°`);
@@ -738,6 +683,8 @@ function formatObjectDetails(objectData) {
   if (Number.isFinite(objectData.argPeriapsis)) lines.push(`Arg. del perihelio (ω): ${objectData.argPeriapsis.toFixed(2)}°`);
   const period = toNumber(objectData.raw?.p_yr);
   if (Number.isFinite(period)) lines.push(`Período orbital: ${period.toFixed(2)} años`);
+  const discoveryRaw = objectData.discoveryDate || objectData.raw?.discovery_date || objectData.raw?.disc_date || objectData.raw?.discoveryDate;
+  if (discoveryRaw) lines.push(`Descubierto: ${discoveryRaw}`);
   return lines.join('\n');
 }
 
@@ -764,7 +711,10 @@ function applyObjectToViewer(objectData) {
   }
 
   if (manSpeed) {
-    manSpeed.value = estimateViewerSpeed(objectData).toFixed(1);
+    const speedValue = Number.isFinite(objectData.velocity)
+      ? objectData.velocity
+      : estimateViewerSpeed(objectData);
+    manSpeed.value = Math.max(0, speedValue).toFixed(1);
   }
 
   updateManualDisplay();
@@ -776,9 +726,10 @@ function applyObjectToViewer(objectData) {
 }
 
 function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false } = {}) {
-  if (!Array.isArray(catalog) || !catalog[index]) return;
+  if (!Array.isArray(filteredCatalog) || !filteredCatalog[index]) return;
   currentObjectIndex = index;
-  const selected = catalog[index];
+  const selected = filteredCatalog[index];
+  currentObjectId = selected?.id || null;
   const previousFlag = suppressDatasetEvents;
   suppressDatasetEvents = true;
   if (objectSelect) objectSelect.value = String(index);
@@ -791,6 +742,79 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   if (updateDetails && apiAsteroidDetails) {
     apiAsteroidDetails.value = formatObjectDetails(selected);
   }
+}
+
+function parseDiscoveryDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function applyFilters({ preserveSelection = false } = {}) {
+  if (!Array.isArray(catalogFull)) catalogFull = [];
+
+  const nameQuery = (filterNameInput?.value || '').trim().toLowerCase();
+  const minDiameter = toNumber(filterMinDiameterInput?.value);
+  const minVelocity = toNumber(filterMinVelocityInput?.value);
+  const dateStart = parseDiscoveryDate(filterDateStartInput?.value);
+  const dateEnd = parseDiscoveryDate(filterDateEndInput?.value);
+
+  const matchesFilters = (item) => {
+    if (!item) return false;
+
+    if (nameQuery) {
+      const name = (item.name || '').toLowerCase();
+      if (!name.includes(nameQuery)) return false;
+    }
+
+    if (Number.isFinite(minDiameter)) {
+      if (!Number.isFinite(item.diameterKm) || item.diameterKm < minDiameter) return false;
+    }
+
+    if (Number.isFinite(minVelocity) && minVelocity > 0) {
+      const velocityCandidates = [
+        item.velocity,
+        toNumber(item.raw?.velocity),
+        toNumber(item.raw?.velocity_kms),
+        toNumber(item.raw?.velocity_km_s),
+        toNumber(item.raw?.relative_velocity)
+      ];
+      const velocity = velocityCandidates.find((val) => Number.isFinite(val));
+      if (!Number.isFinite(velocity) || velocity < minVelocity) return false;
+    }
+
+    if (dateStart || dateEnd) {
+      const rawDate = item.discoveryDate || item.raw?.discovery_date || item.raw?.disc_date || item.raw?.discoveryDate || item.discovery_date;
+      const parsed = parseDiscoveryDate(rawDate);
+      if (!parsed) return false;
+      if (dateStart && parsed < dateStart) return false;
+      if (dateEnd && parsed > dateEnd) return false;
+    }
+
+    return true;
+  };
+
+  const previousId = preserveSelection ? currentObjectId : null;
+  filteredCatalog = catalogFull.filter(matchesFilters);
+
+  populateObjectSelect();
+  populateApiSelect();
+
+  if (!filteredCatalog.length) {
+    currentObjectIndex = null;
+    currentObjectId = null;
+    updateObjectSummary(null);
+    if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    return;
+  }
+
+  let newIndex = 0;
+  if (preserveSelection && previousId) {
+    const idx = filteredCatalog.findIndex((item) => item.id === previousId);
+    if (idx >= 0) newIndex = idx;
+  }
+
+  setActiveObjectByIndex(newIndex, { updateViewer: true, updateDetails: true });
 }
 
 function getRawDatasetForKey(key) {
@@ -818,13 +842,9 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   if (!DATA_SOURCES[key]) return;
   if (isCatalogLoading) return;
 
-  if (!forceReload && currentDatasetKey === key && catalog.length) {
-    populateObjectSelect();
-    populateApiSelect();
-    if (catalog[currentObjectIndex || 0]) {
-      updateObjectSummary(catalog[currentObjectIndex || 0]);
-    }
+  if (!forceReload && currentDatasetKey === key && catalogFull.length) {
     updateDatasetRadios(key);
+    applyFilters({ preserveSelection: true });
     return;
   }
 
@@ -838,33 +858,24 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   try {
     const rawData = await ensureDatabaseLoaded(key);
     const normalizer = key === 'comets' ? normalizeCometRecord : normalizeAsteroidRecord;
-    catalog = (rawData || []).map((record, index) => normalizer(record, index)).filter(Boolean);
+    catalogFull = (rawData || []).map((record, index) => normalizer(record, index)).filter(Boolean);
   } catch (error) {
     console.error('No se pudo cargar el catálogo:', error);
-    catalog = [];
+    catalogFull = [];
   } finally {
     isCatalogLoading = false;
   }
 
-  if (!catalog.length) {
+  if (!catalogFull.length) {
     const fallback = key === 'comets' ? FALLBACK_COMETS : FALLBACK_ASTEROIDS;
     const normalizer = key === 'comets' ? normalizeCometRecord : normalizeAsteroidRecord;
-    catalog = fallback.map((record, index) => normalizer(record, index)).filter(Boolean);
+    catalogFull = fallback.map((record, index) => normalizer(record, index)).filter(Boolean);
   }
 
-  currentObjectIndex = catalog.length ? 0 : null;
-  populateObjectSelect();
-  populateApiSelect();
-
-  if (catalog.length) {
-    suppressDatasetEvents = true;
-    if (objectSelect) objectSelect.value = String(currentObjectIndex);
-    if (apiAsteroidSelect) apiAsteroidSelect.value = String(currentObjectIndex);
-    suppressDatasetEvents = false;
-    setActiveObjectByIndex(currentObjectIndex, { updateViewer: true, updateDetails: true });
-  } else {
-    updateObjectSummary(null);
-  }
+  filteredCatalog = catalogFull.slice();
+  currentObjectIndex = null;
+  currentObjectId = null;
+  applyFilters({ preserveSelection: false });
 }
 
 if (objectSelect) {
@@ -886,6 +897,19 @@ datasetViewerRadios.forEach((radio) => {
   radio.addEventListener('change', () => {
     if (!radio.checked || suppressDatasetEvents) return;
     switchDataset(radio.value, { origin: 'viewer', forceReload: true });
+  });
+});
+
+[
+  [filterNameInput, ['input']],
+  [filterMinDiameterInput, ['input', 'change']],
+  [filterMinVelocityInput, ['input', 'change']],
+  [filterDateStartInput, ['input', 'change']],
+  [filterDateEndInput, ['input', 'change']]
+].forEach(([element, events]) => {
+  if (!element || !Array.isArray(events)) return;
+  events.forEach((eventName) => {
+    element.addEventListener(eventName, () => applyFilters({ preserveSelection: true }));
   });
 });
 
@@ -1154,32 +1178,33 @@ if (manRotation) {
 
 function populateApiSelect() {
   if (!apiAsteroidSelect) return;
+  suppressDatasetEvents = true;
   apiAsteroidSelect.innerHTML = '';
 
-  if (!catalog.length) {
+  if (!filteredCatalog.length) {
     setSelectLoading(apiAsteroidSelect, 'Sin datos disponibles');
+    suppressDatasetEvents = false;
     return;
   }
 
-  catalog.forEach((item, idx) => {
+  filteredCatalog.forEach((item, idx) => {
     const opt = document.createElement('option');
     opt.value = String(idx);
     const diameterLabel = Number.isFinite(item.diameterKm) ? `Ø ${item.diameterKm.toFixed(1)} km` : 'Ø N/D';
-    const speedLabel = `v ${estimateViewerSpeed(item).toFixed(1)} km/s`;
+    const speedValue = Number.isFinite(item.velocity) ? item.velocity : estimateViewerSpeed(item);
+    const speedLabel = Number.isFinite(speedValue) ? `v ${speedValue.toFixed(1)} km/s` : 'v N/D';
     opt.textContent = `${item.name} — ${diameterLabel}, ${speedLabel}`;
     apiAsteroidSelect.appendChild(opt);
   });
 
   apiAsteroidSelect.disabled = false;
-  const indexToSelect = currentObjectIndex !== null ? currentObjectIndex : 0;
-  apiAsteroidSelect.value = String(indexToSelect);
-  updateApiDetails();
+  suppressDatasetEvents = false;
 }
 
 function updateApiDetails() {
   if (!apiAsteroidSelect || !apiAsteroidDetails) return;
   const idx = Number(apiAsteroidSelect.value || 0);
-  const objectData = catalog[idx];
+  const objectData = filteredCatalog[idx];
 
   if (!objectData) {
     apiAsteroidDetails.value = 'No hay datos disponibles';
