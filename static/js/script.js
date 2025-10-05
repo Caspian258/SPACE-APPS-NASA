@@ -247,7 +247,11 @@ function initThree() {
 
     // --- Fondo estelar ---
     const textureLoader = new THREE_NS.TextureLoader();
-    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', () => console.log('✨ Fondo de estrellas cargado'), undefined, (err) => console.warn('⚠️ Error al cargar fondo estelar:', err));
+    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', 
+        () => console.log('✨ Fondo de estrellas cargado'),
+        undefined, 
+        (err) => console.warn('⚠️ Error al cargar fondo estelar:', err)
+    );
     const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
     const starMaterial = new THREE_NS.MeshBasicMaterial({
         map: starTexture,
@@ -256,14 +260,15 @@ function initThree() {
     starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
     scene.add(starSphere);
 
+    // --- Grupo principal del sistema solar ---
+    solarSystemGroup = new THREE_NS.Group();
+    scene.add(solarSystemGroup);
+
     // --- Grupo para el Sol ---
     sunGroup = new THREE_NS.Group();
-    scene.add(sunGroup);
+    solarSystemGroup.add(sunGroup);
 
-    // Sol (Mallado visual. Usa MeshBasicMaterial para auto-iluminarse)
-    // --- Sol (auto-iluminado) ---
     // ☀️ Sol (emite luz propia)
-    // --- Sol (autoiluminado con textura) ---
     const sunGeometry = new THREE_NS.SphereGeometry(1.5, 64, 64);
     const sunTexture = new THREE_NS.TextureLoader().load(
         'static/textures/sol.jpg',
@@ -273,23 +278,20 @@ function initThree() {
     );
     const sunMaterial = new THREE_NS.MeshBasicMaterial({
         map: sunTexture,
-        toneMapped: false // evita que se atenúe el brillo
+        toneMapped: false
     });
     sunMesh = new THREE_NS.Mesh(sunGeometry, sunMaterial);
     sunMesh.position.set(0, 0, 0);
-    scene.add(sunMesh);
+    sunGroup.add(sunMesh);
 
     // 💡 Luz solar que ilumina la Tierra
     sunLight = new THREE_NS.PointLight(0xffffff, 1.6, 100);
     sunLight.position.set(0, 0, 0);
     sunLight.castShadow = true;
-    scene.add(sunLight);
+    sunGroup.add(sunLight);
 
-    // AJUSTES CLAVE DE SOMBRA
     sunLight.shadow.mapSize.width = 4096; 
     sunLight.shadow.mapSize.height = 4096;
-
-    // Ajuste del frustum para cubrir la órbita de la Tierra
     const d = 8; 
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
@@ -299,14 +301,12 @@ function initThree() {
     sunLight.shadow.camera.far = 20; 
     sunLight.shadow.bias = -0.0001; 
 
-    sunGroup.add(sunLight);
-
     // --- Grupo para la Tierra ---
     earthGroup = new THREE_NS.Group();
     earthGroup.position.set(sunOrbitRadius, 0, 0); 
     sunGroup.add(earthGroup);
 
-    // Tierra
+    // 🌍 Tierra
     earthMesh = createPlanet({
         name: 'Tierra',
         radius: 0.7,
@@ -314,7 +314,7 @@ function initThree() {
     });
     earthGroup.add(earthMesh);
 
-    // Nubes
+    // ☁️ Nubes
     const cloudsMesh = createPlanet({
         name: 'Nubes',
         texturePath: 'static/textures/fair_clouds_4k.png',
@@ -328,7 +328,7 @@ function initThree() {
     cloudsMesh.receiveShadow = false;
     earthMesh.add(cloudsMesh);
 
-    // Luna
+    // 🌕 Luna
     moonMesh = createPlanet({
         name: 'Luna',
         texturePath: 'static/textures/luna.jpg',
@@ -340,61 +340,28 @@ function initThree() {
     moonMesh.position.set(moonOrbitRadius, 0.5, 0);
     earthMesh.add(moonMesh);
 
-    // --- Luz ambiental general ---
+    // --- Luz ambiental ---
     scene.add(new THREE_NS.AmbientLight(0x888888, 1.5)); 
 
-    // --- Controles 3D y animación ---
+    // --- Ajuste inicial de la vista ---
+    solarSystemGroup.rotation.x = 0.3;
+    solarSystemGroup.rotation.y = 0.8;
+
+    // --- Controles y animación ---
     add3DControls(); 
-    setupFollowButton(); // Configura el botón de seguimiento
+    setupFollowButton();
+    setupResetSystemButton();
     animate();
 }
 
-// --- Controles de mouse/arrastre ---
-function add3DControls() {
-    let prevMouseX = 0, prevMouseY = 0;
 
-    threeContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-        isFollowingEarth = false; // Detener seguimiento al intentar arrastrar
-        const button = document.getElementById('followEarthButton');
-        if (button) button.textContent = 'Centrar en Tierra 🌍';
-    });
 
-    threeContainer.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - prevMouseX;
-        const deltaY = e.clientY - prevMouseY;
-
-        rotVelY = deltaX * rotationSpeedFactor; 
-        rotVelX = deltaY * rotationSpeedFactor;
-
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-
-    window.addEventListener('resize', () => {
-        const w = threeContainer.clientWidth || 600;
-        const h = threeContainer.clientHeight || 400;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
-    });
-}
-
-// --- Configuración del botón de seguimiento ---
+// --- Botón de seguimiento ---
 function setupFollowButton() {
     const button = document.createElement('button');
     button.textContent = 'Centrar en Tierra 🌍';
     button.id = 'followEarthButton';
     
-    // Estilo CSS básico para que no estorbe (Añadido al body)
     button.style.position = 'absolute';
     button.style.bottom = '10px';
     button.style.left = '10px';
@@ -412,17 +379,88 @@ function setupFollowButton() {
         isFollowingEarth = !isFollowingEarth;
         if (isFollowingEarth) {
             button.textContent = 'Dejar de Seguir';
-            // Al iniciar el seguimiento, establecemos una posición de cámara inicial
             camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
-            
         } else {
             button.textContent = 'Centrar en Tierra 🌍';
-            // Volvemos a la vista general
             camera.position.set(0, 0, 15);
             camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
         }
     });
 }
+
+// --- Botón para reiniciar el Sistema Solar ---
+function setupResetSystemButton() {
+    const button = document.createElement('button');
+    button.textContent = 'Reiniciar Sistema Solar 🔄';
+    button.id = 'resetSystemButton';
+
+    // Estilo (junto al botón de seguir Tierra)
+    button.style.position = 'absolute';
+    button.style.bottom = '10px';
+    button.style.left = '180px';
+    button.style.padding = '8px 15px';
+    button.style.zIndex = '1000';
+    button.style.backgroundColor = 'rgba(70, 130, 180, 0.8)';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+
+    document.body.appendChild(button);
+
+    button.addEventListener('click', () => {
+        if (!solarSystemGroup) return;
+
+        // 🔄 Reiniciar el sistema solar completo
+        solarSystemGroup.rotation.set(0, 0, 0);
+
+        // 🔄 Reiniciar variables globales de movimiento
+        sunAngle = 0;
+        moonAngle = 0;
+        rotVelX = 0;
+        rotVelY = 0;
+
+        // 🔄 Reiniciar también la rotación local de la Tierra
+        if (earthGroup) {
+            earthGroup.rotation.set(0, 0, 0);
+        }
+
+        // 🔄 Reiniciar la posición de la Luna (por seguridad)
+        if (moonMesh) {
+            moonMesh.position.set(moonOrbitRadius, 0.5, 0);
+        }
+
+        // Si estamos siguiendo la Tierra 🌍
+        if (isFollowingEarth) {
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Dejar de Seguir';
+
+            // Mantener cámara centrada en la Tierra
+            const earthPosition = new THREE_NS.Vector3();
+            earthGroup.getWorldPosition(earthPosition);
+
+            // Definir el punto relativo de cámara (1 unidad arriba y 4 atrás)
+            const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
+
+            // Calcular rotación actual del sistema solar
+            const matrix = new THREE_NS.Matrix4().extractRotation(solarSystemGroup.matrixWorld);
+            relativeOffset.applyMatrix4(matrix);
+
+            // Reposicionar la cámara manteniendo el enfoque
+            camera.position.copy(earthPosition).add(relativeOffset);
+            camera.lookAt(earthPosition);
+        } else {
+            // Si no estamos centrados en la Tierra, volver a vista general
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Centrar en Tierra 🌍';
+            camera.position.set(0, 0, 15);
+            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
+        }
+
+        console.log('🌞 Sistema Solar y Tierra reiniciados.');
+    });
+}
+
 
 // --- Animación ---
 function animate() {
@@ -431,7 +469,6 @@ function animate() {
         renderer.render(scene, camera);
         return;
     }
-
 
     // 🌕 Revolución de la Luna
     moonAngle += moonOrbitSpeed;
@@ -443,66 +480,42 @@ function animate() {
     sunAngle += sunOrbitSpeed;
     sunGroup.rotation.y = sunAngle; 
     
-    // 🔄 LÓGICA DE ROTACIÓN MANUAL/AUTOMÁTICA DE LA TIERRA
+    // 🔄 Rotación manual/automática del sistema solar
     if (isDragging) {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
     } else {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
-        // Desaceleración
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
+
         rotVelX *= rotationDamping; 
         rotVelY *= rotationDamping;
-        
-        // Rotación automática 
+
         if (Math.abs(rotVelY) < 0.0001) {
-             earthGroup.rotation.y += 0.001; 
+            solarSystemGroup.rotation.y += 0.0005; 
         }
     }
 
-  if (orbitControls && typeof orbitControls.update === 'function') {
-    orbitControls.update();
-  }
+    if (orbitControls && typeof orbitControls.update === 'function') {
+        orbitControls.update();
+    }
 
-  // Revolución de la Luna alrededor de la Tierra
-  moonAngle += moonOrbitSpeed;
-  moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
-  moonMesh.position.z = Math.sin(moonAngle) * moonOrbitRadius;
-  // Inclinación orbital de la Luna (aproximadamente 5 grados)
-  moonMesh.position.y = Math.sin(moonAngle) * 0.2;
-
-
-    // 🚀 LÓGICA DE SEGUIMIENTO DE LA TIERRA
+    // 🚀 Seguimiento de la Tierra
     if (isFollowingEarth) {
-        // Obtenemos la posición global de la Tierra
         const earthPosition = new THREE_NS.Vector3();
         earthGroup.getWorldPosition(earthPosition);
-
-        // Definimos un punto de vista relativo a la Tierra (ej: 4 unidades detrás)
-        const relativeOffset = new THREE_NS.Vector3(0, 1, 4); 
-        
-        // Creamos una matriz de transformación a partir de la rotación del grupo Sol
+        const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
         const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
-
-        // Aplicamos la rotación orbital del sol (que contiene a la tierra) al offset
-        relativeOffset.applyMatrix4(matrix); 
-        
-        // Posicionamos la cámara: Posición de la Tierra + Offset rotado
+        relativeOffset.applyMatrix4(matrix);
         camera.position.copy(earthPosition).add(relativeOffset);
-        
-        // Apuntamos la cámara a la Tierra
         camera.lookAt(earthPosition);
     }
-    
+
     // 🌌 Movimiento lento del fondo
     starSphere.rotation.y += 0.00005;
 
-    // ☀️ Rotación lenta del Sol (decorativo)
-    if (sunMesh) {
-        sunMesh.rotation.y += 0.0005;
-    }
+    // ☀️ Rotación del Sol
+    if (sunMesh) sunMesh.rotation.y += 0.0005;
 
     renderer.render(scene, camera);
 }
@@ -638,6 +651,7 @@ function impactFlash(positionVec3) {
 
 function add3DControls() {
   if (!THREE_NS || !renderer || !camera) return;
+
   const ControlsCtor = THREE_NS.OrbitControls;
   if (!ControlsCtor) {
     console.warn('OrbitControls no está disponible. Usando controles básicos.');
@@ -655,9 +669,18 @@ function add3DControls() {
       if (!isDragging) return;
       const deltaX = event.clientX - prevX;
       const deltaY = event.clientY - prevY;
-      earthGroup.rotation.y += deltaX * 0.01;
-      earthGroup.rotation.x += deltaY * 0.01;
-      starSphere.rotation.y -= deltaX * 0.002;
+
+      if (isFollowingEarth) {
+        // 🔹 Si estamos centrados en la Tierra, rotar solo la Tierra
+        earthGroup.rotation.y += deltaX * 0.01;
+        earthGroup.rotation.x += deltaY * 0.01;
+      } else {
+        // 🔹 Si no, rotar todo el sistema solar
+        solarSystemGroup.rotation.y += deltaX * 0.01;
+        solarSystemGroup.rotation.x += deltaY * 0.01;
+      }
+
+      starSphere.rotation.y -= deltaX * 0.002;        // efecto sutil en estrellas
       starSphere.rotation.x -= deltaY * 0.002;
       prevX = event.clientX;
       prevY = event.clientY;
@@ -688,6 +711,7 @@ function add3DControls() {
   orbitControls.addEventListener('start', () => { isDragging = true; });
   orbitControls.addEventListener('end', () => { isDragging = false; });
 }
+
 
 function onResize() {
   if (!renderer || !camera) return;
