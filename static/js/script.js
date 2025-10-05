@@ -1539,3 +1539,127 @@ simulateBtn.addEventListener('click', () => {
     } catch (_) {}
   });
 })();
+
+// Parámetros de inicio
+function updateCraterDisplay() {
+    console.log('updateCraterDisplay called'); // Check if function runs
+    
+    // Get slider values
+    const L = parseFloat(diameterInput.value);
+    const v_i = parseFloat(velocityInput.value) * 1000;
+    
+    console.log('Slider values:', { L, v_i }); // Check values
+    
+    // Get other parameters
+    const phi_i = document.getElementById('phi_i') ? 
+                  parseFloat(document.getElementById('phi_i').value) : 2750;
+    const phi_t = 2000;
+    const theta_deg = document.getElementById('theta') ? 
+                      parseFloat(document.getElementById('theta').value) : 45;
+    
+    console.log('Parameters:', { phi_i, phi_t, theta_deg }); // Check parameters
+    
+    // Calculate crater
+    const craterData = calculateCraterImpact(phi_i, phi_t, L, v_i, theta_deg);
+    
+    console.log('Crater data:', craterData); // Check results
+    
+    // Try to update elements
+    const craterTypeEl = document.getElementById('craterType');
+    console.log('craterType element:', craterTypeEl); // Check if element exists
+    
+    if (craterTypeEl) {
+        craterTypeEl.textContent = craterData.craterType;
+    } else {
+        console.error('craterType element not found!');
+    }
+    
+    document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
+    document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
+    document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);
+    document.getElementById('h_fr').textContent = craterData.h_fr > 0 ? craterData.h_fr.toFixed(2) : 'N/A';
+    
+    console.log('Display update complete');
+}
+
+// Make sure button listener is added AFTER the DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    const simulateBtn = document.getElementById('simulateBtn');
+    console.log('Simulate button:', simulateBtn); // Check if button exists
+    
+    if (simulateBtn) {
+        simulateBtn.addEventListener('click', function() {
+            console.log('Button clicked!');
+            updateCraterDisplay();
+        });
+    } else {
+        console.error('simulateBtn not found!');
+    }
+});
+
+// Dimensiones de cráter
+function calculateCraterImpact(phi_i, phi_t, L, v_i, theta_deg) {
+    const H = 8;
+    const Cd = 2;
+    const phi_0 = 1;
+    const theta = (theta_deg * Math.PI) / 180; // Convert to radians
+   
+    // Impactor yield strength
+    const Yi = Math.pow(10, 6) * Math.pow(10, 2.107 + 0.0624 * Math.sqrt(phi_i));
+   
+    // Strength parameter I (using L, not L0)
+    const I_f = 4.07 * ((Cd * H * Yi) / (phi_i * L * Math.pow(v_i, 2) * Math.sin(theta)));
+   
+    let L_final; // Renamed to avoid confusion
+   
+    if (I_f > 1) {
+        L_final = L;
+    } else {
+        // Breakup altitude
+        const z_o = -H * (Math.log(Yi / (phi_0 * Math.pow(v_i, 2))) + 1.308 - 0.314 * I_f - 1.303 * Math.sqrt(1 - I_f));
+       
+        // Density at breakup altitude
+        const phi_zo = phi_0 * Math.exp(-z_o / H);
+       
+        // Dispersion length (using L, not L0)
+        const l = L * Math.sin(theta) * Math.sqrt(phi_i / (Cd * phi_zo));
+       
+        // Final diameter (using L, not L0)
+        L_final = L * Math.sqrt(1 + Math.pow((2 * H / l), 2) * Math.pow((Math.exp((z_o - 0) / (2 * H)) - 1), 2));
+    }
+    
+    const g_E = 9.81;
+    // Transient crater calculations (using L_final, not L)
+    const D_tc = 1.161 * Math.pow(phi_i / phi_t, 1 / 3) * Math.pow(L_final, 0.78) *
+                 Math.pow(v_i, 0.44) * Math.pow(g_E, -0.22) *
+                 Math.pow(Math.sin(theta), 1 / 3);
+   
+    const d_tc = D_tc / (2 * Math.sqrt(2));
+    const V_tc = (Math.PI * Math.pow(D_tc, 3)) / (16 * Math.sqrt(2)) * 1e-9;
+    
+    let craterType, D_fr, d_fr, h_fr;
+    
+    if (D_tc <= 2560) {
+        craterType = 'Cráter simple';
+        D_fr = 1.25 * D_tc;
+        const V_br = 0.032 * Math.pow(D_fr, 3);
+        d_fr = 0.294 * Math.pow(D_fr, 0.301) * 100;
+        h_fr = 0.07 * (Math.pow(D_tc, 4) / Math.pow(D_fr, 3));
+    } else {
+        craterType = 'Cráter complejo';
+        const D_c = 3200;
+        D_fr = 1.17 * Math.pow(D_tc, 1.13) / Math.pow(D_c, 0.13);
+        d_fr = 0.4 * Math.pow(D_fr, 0.3);
+        h_fr = 0;
+    }
+    
+    return {
+        craterType,
+        D_tc,
+        d_tc,
+        V_tc,
+        D_fr,
+        d_fr,
+        h_fr
+    };
+}
