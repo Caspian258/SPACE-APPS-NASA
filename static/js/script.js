@@ -25,6 +25,7 @@ let avPreviousMouseX = 0;
 let avPreviousMouseY = 0;
 let avRotSpeed = 0.01;
 let casualtyCircles = [];
+let seismicCircles = [];
 let currentVisualization = 'crater'; // Default view
 
 // UI
@@ -392,40 +393,6 @@ selectionMap.on('click', (e) => {
 const map = L.map('map2D').setView([20, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(map);
 
-// Second legend for fireball calculations
-const legend2 = L.control({ position: 'bottomright' });
-legend2.onAdd = function() {
-  const div = L.DomUtil.create('div', 'leaflet-control legend');
-  div.style.background = '#0b1526';
-  div.style.border = '1px solid #22304a';
-  div.style.borderRadius = '6px';
-  div.style.padding = '8px';
-  div.style.color = '#e8eef5';
-  div.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-  div.style.marginBottom = '8px';
-  
-  const diameter = parseFloat(diameterInput.value);
-  const velocity = parseFloat(velocityInput.value);
-  const density = parseFloat(densityInput.value);
-  
-  const radius_m = diameter / 2;
-  const volume = (4/3) * Math.PI * Math.pow(radius_m, 3);
-  const mass = density * volume;
-  
-  const velocity_ms = velocity * 1000;
-  const energy_J = 0.5 * mass * Math.pow(velocity_ms, 2);
-  
-  const R_f = 0.002 * Math.pow(energy_J, 1/3);
-  const T_f = R_f / velocity_ms;
-  
-  div.innerHTML = `
-    <div style="font-weight:600;margin-bottom:6px;">Bola de Fuego</div>
-    <div style="margin-bottom:4px;">Radio: ${R_f.toFixed(2)} m</div>
-    <div>Duración: ${T_f.toFixed(3)} s</div>
-  `;
-  return div;
-};
-legend2.addTo(map);
 
 // Vistas 2D/3D
 show3D.addEventListener('click', () => { globe3D.classList.remove('hidden'); map2D.classList.add('hidden'); onResize(); });
@@ -2482,7 +2449,8 @@ vizToggle.onAdd = function() {
   div.style.padding = '12px';
   div.style.color = '#e8eef5';
   div.style.minWidth = '180px';
-  
+  div.style.width = "50%";
+
   div.innerHTML = `
     <div style="font-weight:600;margin-bottom:10px;">Visualizaciones</div>
     <button class="viz-btn" data-viz="crater" style="width:100%;margin-bottom:6px;padding:8px;background:#2a7de1;color:#fff;border:none;border-radius:6px;cursor:pointer;">
@@ -2490,6 +2458,9 @@ vizToggle.onAdd = function() {
     </button>
     <button class="viz-btn" data-viz="blast" style="width:100%;margin-bottom:6px;padding:8px;background:#1a2332;color:#e8eef5;border:1px solid #22304a;border-radius:6px;cursor:pointer;">
       Anillos de Explosión
+    </button>
+    <button class="viz-btn" data-viz="seismic" style="width:100%;margin-bottom:6px;padding:8px;background:#1a2332;color:#e8eef5;border:1px solid #22304a;border-radius:6px;cursor:pointer;">
+      Alcance sísmico
     </button>
     <button class="viz-btn" data-viz="casualties" style="width:100%;padding:8px;background:#1a2332;color:#e8eef5;border:1px solid #22304a;border-radius:6px;cursor:pointer;">
       Víctimas
@@ -2507,8 +2478,8 @@ vizToggle.onAdd = function() {
 
 function switchVisualization(type) {
   currentVisualization = type;
-  
-  // Update buttons
+
+  // --- Update button styles ---
   document.querySelectorAll('.viz-btn').forEach(btn => {
     if (btn.dataset.viz === type) {
       btn.style.background = '#2a7de1';
@@ -2518,28 +2489,42 @@ function switchVisualization(type) {
       btn.style.border = '1px solid #22304a';
     }
   });
+
+  // --- Hide all layers first ---
+  if (craterCircle && map.hasLayer(craterCircle)) map.removeLayer(craterCircle);
+  [blastCircles, casualtyCircles, seismicCircles].forEach(arr => {
+    arr.forEach(c => { if (map.hasLayer(c)) map.removeLayer(c); });
+  });
+
+  // --- Show only the selected visualization ---
+  if (type === 'crater' && craterCircle) {
+    craterCircle.addTo(map);
+    craterCircle.setStyle({ opacity: 0.8, fillOpacity: 0.5 });
+  } 
   
-  // Toggle layers
-  if (craterCircle) {
-    craterCircle.setStyle({ 
-      opacity: type === 'crater' ? 0.8 : 0, 
-      fillOpacity: type === 'crater' ? 0.5 : 0 
+  else if (type === 'blast') {
+    blastCircles.forEach(c => {
+      const baseOpacity = c.options.originalFillOpacity ?? c.options.fillOpacity ?? 0.2;
+      c.setStyle({ opacity: 1, fillOpacity: baseOpacity });
+      c.addTo(map);
+    });
+  } 
+  
+  else if (type === 'casualties') {
+    casualtyCircles.forEach(c => {
+      const baseOpacity = c.options.originalFillOpacity ?? c.options.fillOpacity ?? 0.2;
+      c.setStyle({ opacity: 1, fillOpacity: baseOpacity });
+      c.addTo(map);
+    });
+  } 
+  
+  else if (type === 'seismic') {
+    const opacities = [0.1, 0.15, 0.2, 0.25, 0.3]; // outer → inner
+    seismicCircles.forEach((c, idx) => {
+      c.setStyle({ opacity: 1, fillOpacity: opacities[idx] || 0.2 });
+      c.addTo(map);
     });
   }
-  
-  blastCircles.forEach(c => {
-    c.setStyle({ 
-      opacity: type === 'blast' ? 2 : 0, 
-      fillOpacity: type === 'blast' ? (c.options.originalFillOpacity || 0.2) : 0 
-    });
-  });
-  
-  casualtyCircles.forEach(c => {
-    c.setStyle({ 
-      opacity: type === 'casualties' ? 2 : 0, 
-      fillOpacity: type === 'casualties' ? (c.options.originalFillOpacity || 0.2) : 0 
-    });
-  });
 }
 
 const accessibilityMenuButton = document.getElementById('accessibilityMenuButton');
@@ -2697,6 +2682,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 let craterCircle;
 
+
+
 // Parámetros de inicio
 function updateCraterDisplay() {
     console.log('=== updateCraterDisplay START ===');
@@ -2721,6 +2708,9 @@ function updateCraterDisplay() {
     const phi_i = parseFloat(document.getElementById('density').value);
     const phi_t = 2000;
     const theta_deg = parseFloat(document.getElementById('mitigation').value);
+
+    // const theta_rad = (theta_deg * Math.PI) / 180;
+    // const v_i = v_0 * Math.exp(3 / (2 * phi_i * L_input * Math.sin(theta_rad)));
     
     console.log('Using density from input:', phi_i);
     
@@ -3031,6 +3021,66 @@ function drawCasualtyRings(latlng, radiusMiles, casualties) {
   }
 }
 
+// Enhanced seismic visualization function
+function visualizeSeismicZones(latlng, mass, velocity) {
+    // Clear old seismic circles
+    seismicCircles.forEach(c => map.removeLayer(c));
+    seismicCircles = [];
+    
+    // Constants
+    const RE = 6371;
+    const MT = 9.184e15;
+    
+    // Calculate base magnitude
+    const Ek = 0.5 * mass * Math.pow(velocity, 2);
+    const E = Ek / MT;
+    const M = 0.67 * Math.log10(E) - 5.87;
+    
+    // Define seismic zones with distances and descriptions
+    const zones = [
+        { distance: 50, color: '#8B0000', desc: 'Daño extremo', opacity: 0.3 },
+        { distance: 100, color: '#FF4500', desc: 'Daño severo', opacity: 0.25 },
+        { distance: 300, color: '#FF8C00', desc: 'Daño moderado', opacity: 0.2 },
+        { distance: 600, color: '#FFD700', desc: 'Daño ligero', opacity: 0.15 },
+        { distance: 900, color: '#90EE90', desc: 'Perceptible', opacity: 0.1 }
+    ];
+    
+    // Draw circles from largest to smallest
+    for (let i = zones.length - 1; i >= 0; i--) {
+        const zone = zones[i];
+        const distance_km = zone.distance;
+        
+        // Calculate effective magnitude at this distance
+        let Meff;
+        if (distance_km < 60) {
+            Meff = M - 0.0238 * distance_km;
+        } else if (distance_km < 700) {
+            Meff = M - 0.0048 * distance_km - 1.1644;
+        } else {
+            const delta = distance_km / RE;
+            Meff = M - 1.661 * Math.log10(delta) - 6.399;
+        }
+        
+        const circle = L.circle(latlng, {
+            radius: distance_km * 1000, // Convert km to meters
+            color: zone.color,
+            weight: 2,
+            fillColor: zone.color,
+            fillOpacity: zone.opacity
+        }).addTo(map);
+        
+        circle.bindPopup(`
+            <b>${zone.desc}</b><br/>
+            <b>Distancia:</b> ${distance_km} km<br/>
+            <b>Magnitud sísmica:</b> ${Meff.toFixed(2)}
+        `);
+        
+        seismicCircles.push(circle);
+    }
+    
+    return M;
+}
+
 // Update your updateCraterDisplay function to include blast effects
 async function updateCraterDisplay() {
   console.log('=== updateCraterDisplay START ===');
@@ -3049,6 +3099,8 @@ async function updateCraterDisplay() {
   
   const L_input = parseFloat(diameterInput.value);
   const v_i = parseFloat(velocityInput.value) * 1000;
+  // const theta_rad = (theta_deg * Math.PI) / 180;
+  // const v_i = v_0 * Math.exp(3 / (2 * phi_i * L_input * Math.sin(theta_rad)));
   const phi_i = parseFloat(document.getElementById('density').value);
   const phi_t = 2000;
   const theta_deg = 120 - parseFloat(document.getElementById('mitigation').value);
@@ -3078,11 +3130,14 @@ async function updateCraterDisplay() {
   drawBlastRings(impactCoords, energy_megatons);
   
   // Calculate casualties (convert crater radius to miles for casualty model)
-  const radiusMiles = (craterData.D_fr / 2) / 1609.34;
+  const radiusMiles = ((craterData.D_fr / 2) / 1609.34);
   const casualties = await calculateCasualties(impactCoords, radiusMiles * 3);
   
   drawCasualtyRings(impactCoords, radiusMiles, casualties);
   
+  // Visualize seismic zones
+  const baseMagnitude = visualizeSeismicZones(impactCoords, mass, v_i);
+
   // Add toggle if not exists
   if (!map._controlCorners.topleft.querySelector('.visualization-toggle')) {
     vizToggle.addTo(map);
@@ -3091,10 +3146,10 @@ async function updateCraterDisplay() {
   // Show current visualization
   switchVisualization(currentVisualization);
 
-  // Add casualties to results
+  // Update magnitude and casualties display
   const magnitudeEl = document.getElementById('magnitude');
   if (magnitudeEl) {
-    magnitudeEl.textContent = `Población estimada: ${casualties.pop.toLocaleString()}, Muertes: ${Math.round(casualties.totalFatal).toLocaleString()}, Heridos: ${Math.round(casualties.totalInj).toLocaleString()}`;
+    magnitudeEl.textContent = `${baseMagnitude.toFixed(2)} Richter | Población: ${casualties.pop.toLocaleString()}, Muertes: ${Math.round(casualties.totalFatal).toLocaleString()}, Heridos: ${Math.round(casualties.totalInj).toLocaleString()}`;
   }
   
   console.log('=== updateCraterDisplay END ===');
