@@ -20,6 +20,10 @@ let moonAngle = 0;
 let moonOrbitRadius = 2;
 let moonOrbitSpeed = 0.01;
 let orbitControls = null;
+let avDragging = false;
+let avPreviousMouseX = 0;
+let avPreviousMouseY = 0;
+let avRotSpeed = 0.01;
 
 // UI
 const diameterInput = document.getElementById('diameter'); 
@@ -34,6 +38,8 @@ const energyOut = document.getElementById('energy');
 const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
+const probabilityDebugOut = document.getElementById('probability-result');
+const calculateProbBtn = document.getElementById('calculate-prob-btn');
 
 
 
@@ -51,6 +57,268 @@ const neoMinVel = document.getElementById('neoMinVel');
 const neoMaxVel = document.getElementById('neoMaxVel');
 const neoSearch = document.getElementById('neoSearch');
 
+const translations = {
+  es: {
+    title: 'Asteroid Impact Simulator',
+    subtitle: 'Explora el impacto de asteroides y estrategias de mitigación.',
+    controlPanelHeading: 'Panel de Control',
+    'label.diameter': 'Diámetro del Asteroide (m)',
+    'label.velocity': 'Velocidad del Asteroide (km/s)',
+    'label.density': 'Densidad (kg/m³)',
+    'label.selectImpact': 'Selecciona el punto de impacto',
+    'label.mitigation': 'Velocidad de Deflexión (km/s)',
+    'tooltip.mitigation': 'Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.',
+    'button.simulate': '¡Simular Impacto!',
+    'button.view3D': 'Ver Globo 3D',
+    'button.view2D': 'Ver Mapa 2D',
+    'label.catalogHeading': 'Catálogo de objetos',
+    'radio.asteroids': 'Asteroides',
+    'radio.comets': 'Cometas',
+    'label.selectObject': 'Seleccionar objeto',
+    'label.filterName': 'Buscar por nombre',
+    'placeholder.filterName': 'Ej: Apophis',
+    'label.filterMinDiameter': 'Diámetro mínimo (km)',
+    'label.filterMinVelocity': 'Velocidad mínima (km/s)',
+    'placeholder.numeric': '0.0',
+    'label.discoveryRange': 'Rango de fechas de descubrimiento',
+    'button.calculateProbability': 'Calcular Probabilidad de Impacto',
+  'option.loadingCatalog': 'Cargando catálogo...',
+  'option.emptyCatalog': 'Sin datos disponibles',
+  'message.noDataAvailable': 'No hay datos disponibles',
+  'message.selectFromCatalog': 'Selecciona un objeto del catálogo',
+  'summary.type.asteroid': 'Asteroide',
+  'summary.type.comet': 'Cometa',
+  'summary.diameter': 'Diámetro',
+  'summary.semiMajor': 'a',
+  'summary.eccentricity': 'e',
+  'details.name': 'Nombre',
+  'details.type': 'Tipo',
+  'details.type.asteroid': 'Asteroide',
+  'details.type.comet': 'Cometa',
+  'details.estimatedDiameter': 'Diámetro estimado',
+  'details.modelDensity': 'Densidad modelo',
+  'details.rotationPeriod': 'Periodo de rotación aprox.',
+  'details.velocity': 'Velocidad estimada',
+  'details.semiMajor': 'Semieje mayor (a)',
+  'details.eccentricity': 'Excentricidad (e)',
+  'details.inclination': 'Inclinación (i)',
+  'details.ascendingNode': 'Nodo ascendente (Ω)',
+  'details.argPeriapsis': 'Arg. del perihelio (ω)',
+  'details.orbitalPeriod': 'Período orbital',
+  'details.discovery': 'Descubierto',
+  'details.rotationHours': 'h',
+  'units.years': 'años',
+    resultsHeading: 'Resultados',
+    'results.energy': 'Energía de Impacto:',
+    'results.craterType': 'Tipo de cráter:',
+    'results.initialDiameter': 'Diámetro inicial:',
+    'results.finalDiameter': 'Diámetro final:',
+    'results.finalDepth': 'Profundidad final:',
+    'results.rimHeight': 'Altura de cresta:',
+    'results.probability': 'Probabilidad de Impacto por Órbita (debug):',
+    'units.megatons': 'Megatones',
+    'units.meters': 'm',
+    'neo.heading': 'Selecciona un NEO',
+    'neo.source': 'Fuente: NASA NeoWs (demo)',
+    'button.apply': 'Aplicar',
+    'button.close': 'Cerrar',
+    'viewer.heading': 'Visor de Asteroides',
+    'viewer.modeLabel': 'Modo',
+    'viewer.modeManual': 'Modo Manual',
+  'viewer.modeApi': 'Modo API',
+    'viewer.modeHint': 'Pulsa para alternar entre Manual y API',
+    'viewer.manual.diameter': 'Diámetro (km)',
+    'viewer.manual.speed': 'Velocidad (unid.)',
+    'viewer.manual.density': 'Densidad (kg/m³)',
+    'viewer.manual.rotation': 'Rotación (°/s)',
+    'viewer.api.sourceLabel': 'Fuente de datos',
+    'viewer.api.listLabel': 'Lista de asteroides (catálogo)',
+    'viewer.api.detailsLabel': 'Detalles',
+    'footer.disclaimer': 'Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)',
+    'menu.accessibility': 'Accesibilidad y ayuda',
+    'menu.colorToggle': 'Modo daltónico',
+    'menu.faq': 'Preguntas frecuentes',
+    'menu.languageLabel': 'Idioma',
+    'menu.lang.es': 'Español',
+    'menu.lang.en': 'English',
+    'faq.title': 'Preguntas frecuentes',
+    'faq.q1': '¿Cómo selecciono un punto de impacto?',
+    'faq.a1': 'Usa el mapa de selección en el panel izquierdo y haz clic en la ubicación deseada. El marcador mostrará las coordenadas exactas.',
+    'faq.q2': '¿Qué significa el modo daltónico?',
+    'faq.a2': 'Activa una paleta de alto contraste pensada para usuarios con daltonismo y condiciones de baja visibilidad.',
+    'faq.q3': '¿Cómo cambio entre asteroides y cometas?',
+    'faq.a3': 'Utiliza los botones de radio en el catálogo o en el visor 3D para alternar entre los conjuntos de datos disponibles.',
+    'faq.closeAria': 'Cerrar'
+  },
+  en: {
+    title: 'Asteroid Impact Simulator',
+    subtitle: 'Explore asteroid impacts and mitigation strategies.',
+    controlPanelHeading: 'Control Panel',
+    'label.diameter': 'Asteroid Diameter (m)',
+    'label.velocity': 'Asteroid Velocity (km/s)',
+    'label.density': 'Density (kg/m³)',
+    'label.selectImpact': 'Select the impact point',
+    'label.mitigation': 'Deflection Velocity (km/s)',
+    'tooltip.mitigation': 'A kinetic impactor is a spacecraft that strikes the asteroid to slightly change its speed and trajectory.',
+    'button.simulate': 'Run Impact Simulation',
+    'button.view3D': 'Show 3D Globe',
+    'button.view2D': 'Show 2D Map',
+    'label.catalogHeading': 'Object Catalog',
+    'radio.asteroids': 'Asteroids',
+    'radio.comets': 'Comets',
+    'label.selectObject': 'Select object',
+    'label.filterName': 'Search by name',
+    'placeholder.filterName': 'e.g., Apophis',
+    'label.filterMinDiameter': 'Minimum diameter (km)',
+    'label.filterMinVelocity': 'Minimum velocity (km/s)',
+    'placeholder.numeric': '0.0',
+    'label.discoveryRange': 'Discovery date range',
+    'button.calculateProbability': 'Compute Impact Probability',
+  'option.loadingCatalog': 'Loading catalog...',
+  'option.emptyCatalog': 'No data available',
+  'message.noDataAvailable': 'No data available',
+  'message.selectFromCatalog': 'Pick an object from the catalog',
+  'summary.type.asteroid': 'Asteroid',
+  'summary.type.comet': 'Comet',
+  'summary.diameter': 'Diameter',
+  'summary.semiMajor': 'a',
+  'summary.eccentricity': 'e',
+  'details.name': 'Name',
+  'details.type': 'Type',
+  'details.type.asteroid': 'Asteroid',
+  'details.type.comet': 'Comet',
+  'details.estimatedDiameter': 'Estimated diameter',
+  'details.modelDensity': 'Model density',
+  'details.rotationPeriod': 'Approx. rotation period',
+  'details.velocity': 'Estimated velocity',
+  'details.semiMajor': 'Semi-major axis (a)',
+  'details.eccentricity': 'Eccentricity (e)',
+  'details.inclination': 'Inclination (i)',
+  'details.ascendingNode': 'Ascending node (Ω)',
+  'details.argPeriapsis': 'Argument of perihelion (ω)',
+  'details.orbitalPeriod': 'Orbital period',
+  'details.discovery': 'Discovered',
+  'details.rotationHours': 'h',
+  'units.years': 'years',
+    resultsHeading: 'Results',
+    'results.energy': 'Impact Energy:',
+    'results.craterType': 'Crater type:',
+    'results.initialDiameter': 'Initial diameter:',
+    'results.finalDiameter': 'Final diameter:',
+    'results.finalDepth': 'Final depth:',
+    'results.rimHeight': 'Rim height:',
+    'results.probability': 'Orbit Impact Probability (debug):',
+    'units.megatons': 'Megatons',
+    'units.meters': 'm',
+    'neo.heading': 'Choose a NEO',
+    'neo.source': 'Source: NASA NeoWs (demo)',
+    'button.apply': 'Apply',
+    'button.close': 'Close',
+    'viewer.heading': 'Asteroid Viewer',
+    'viewer.modeLabel': 'Mode',
+    'viewer.modeManual': 'Manual Mode',
+  'viewer.modeApi': 'API Mode',
+    'viewer.modeHint': 'Tap to switch between Manual and API',
+    'viewer.manual.diameter': 'Diameter (km)',
+    'viewer.manual.speed': 'Speed (units)',
+    'viewer.manual.density': 'Density (kg/m³)',
+    'viewer.manual.rotation': 'Rotation (°/s)',
+    'viewer.api.sourceLabel': 'Data source',
+    'viewer.api.listLabel': 'Catalog list',
+    'viewer.api.detailsLabel': 'Details',
+    'footer.disclaimer': 'Data: NASA APIs and USGS (simulated). This simulator is educational and simplified. (Standalone front-end)',
+    'menu.accessibility': 'Accessibility & help',
+    'menu.colorToggle': 'Colorblind mode',
+    'menu.faq': 'Frequently Asked Questions',
+    'menu.languageLabel': 'Language',
+    'menu.lang.es': 'Spanish',
+    'menu.lang.en': 'English',
+    'faq.title': 'Frequently Asked Questions',
+    'faq.q1': 'How do I choose an impact point?',
+    'faq.a1': 'Use the selection map in the left panel and click the desired location. The marker shows the exact coordinates.',
+    'faq.q2': 'What does colorblind mode do?',
+    'faq.a2': 'Enables a high-contrast palette designed for users with color vision deficiency and low-visibility conditions.',
+    'faq.q3': 'How do I switch between asteroids and comets?',
+    'faq.a3': 'Use the radio buttons in the catalog or in the 3D viewer to swap between the available datasets.',
+    'faq.closeAria': 'Close'
+  }
+};
+
+const LANGUAGE_STORAGE_KEY = 'simulator-language';
+let currentLanguage = 'es';
+
+function applyTextTranslation(elements, dict, attribute, callback) {
+  elements.forEach((el) => {
+    const key = el.getAttribute(attribute);
+    if (!key) return;
+    const value = dict[key];
+    if (typeof value === 'undefined') return;
+    callback(el, value);
+  });
+}
+
+function translate(key) {
+  if (!key) return '';
+  const dict = translations[currentLanguage] || translations.es;
+  if (Object.prototype.hasOwnProperty.call(dict, key)) return dict[key];
+  const fallback = translations.es;
+  if (fallback && Object.prototype.hasOwnProperty.call(fallback, key)) return fallback[key];
+  return '';
+}
+
+function setLanguage(lang) {
+  if (!translations[lang]) {
+    lang = 'es';
+  }
+  currentLanguage = lang;
+  const dict = translations[lang];
+  document.documentElement.setAttribute('lang', lang);
+  try {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  } catch (_) {}
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n]'), dict, 'data-i18n', (el, value) => {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.value = value;
+    } else {
+      el.textContent = value;
+    }
+  });
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n-placeholder]'), dict, 'data-i18n-placeholder', (el, value) => {
+    el.setAttribute('placeholder', value);
+  });
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n-aria-label]'), dict, 'data-i18n-aria-label', (el, value) => {
+    el.setAttribute('aria-label', value);
+  });
+
+  const menuButton = document.getElementById('accessibilityMenuButton');
+  if (menuButton) {
+    const label = dict['menu.accessibility'];
+    if (label) {
+      menuButton.title = label;
+      const icon = menuButton.querySelector('img');
+      if (icon) icon.alt = label;
+    }
+  }
+
+  document.querySelectorAll('.lang-option').forEach((btn) => {
+    const option = btn.getAttribute('data-lang-option');
+    btn.classList.toggle('active', option === lang);
+  });
+
+  if (modeToggle) {
+    const modeKey = viewerMode === 'manual' ? 'viewer.modeManual' : 'viewer.modeApi';
+    const label = dict[modeKey];
+    if (label) modeToggle.textContent = label;
+  }
+
+  updateSliderDisplays();
+  updateManualDisplay();
+  updateObjectSummary(getCurrentSelectedItem());
+  updateApiDetails();
+}
 
 // Vistas
 const show3D = document.getElementById('show3D');
@@ -95,8 +363,15 @@ function updateSliderDisplays() {
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
   mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
 }
-[diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
+[diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
+
+if (calculateProbBtn) {
+  calculateProbBtn.addEventListener('click', () => {
+    const selectedObject = getCurrentSelectedItem();
+    computeAndDisplayImpactProbability(selectedObject, { source: 'button' });
+  });
+}
 
 // Leaflet: mapa de selección (pequeño)
 const selectionMap = L.map('selectMap', {
@@ -104,7 +379,7 @@ const selectionMap = L.map('selectMap', {
   attributionControl: false,
   zoomControl: false
 }).setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 7 }).addTo(selectionMap);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(selectionMap);
 selectionMap.on('click', (e) => {
   selectedLat = e.latlng.lat;
   selectedLon = e.latlng.lng;
@@ -115,7 +390,7 @@ selectionMap.on('click', (e) => {
 
 // Leaflet: mapa principal
 const map = L.map('map2D').setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(map);
 
 // Leyenda en el mapa
 const legend = L.control({ position: 'bottomright' });
@@ -135,6 +410,40 @@ legend.onAdd = function() {
   return div;
 };
 legend.addTo(map);
+// Second legend for fireball calculations
+const legend2 = L.control({ position: 'bottomright' });
+legend2.onAdd = function() {
+  const div = L.DomUtil.create('div', 'leaflet-control legend');
+  div.style.background = '#0b1526';
+  div.style.border = '1px solid #22304a';
+  div.style.borderRadius = '6px';
+  div.style.padding = '8px';
+  div.style.color = '#e8eef5';
+  div.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+  div.style.marginBottom = '8px';
+  
+  const diameter = parseFloat(diameterInput.value);
+  const velocity = parseFloat(velocityInput.value);
+  const density = parseFloat(densityInput.value);
+  
+  const radius_m = diameter / 2;
+  const volume = (4/3) * Math.PI * Math.pow(radius_m, 3);
+  const mass = density * volume;
+  
+  const velocity_ms = velocity * 1000;
+  const energy_J = 0.5 * mass * Math.pow(velocity_ms, 2);
+  
+  const R_f = 0.002 * Math.pow(energy_J, 1/3);
+  const T_f = R_f / velocity_ms;
+  
+  div.innerHTML = `
+    <div style="font-weight:600;margin-bottom:6px;">Bola de Fuego</div>
+    <div style="margin-bottom:4px;">Radio: ${R_f.toFixed(2)} m</div>
+    <div>Duración: ${T_f.toFixed(3)} s</div>
+  `;
+  return div;
+};
+legend2.addTo(map);
 
 // Capas de datos simuladas (carga desde /static/data si existen)
 fetch('static/data/seismic_zones.geojson').then(r=>r.json()).then(geo=>{
@@ -179,8 +488,7 @@ const threeContainer = document.getElementById('globe3D') || {
     innerHTML: '', 
     appendChild: () => {} 
 };
-
-// --- Función genérica para crear planetas ---
+// --- Función genérica para crear planetas -__
 function createPlanet({
     name,
     texturePath,
@@ -248,7 +556,11 @@ function initThree() {
 
     // --- Fondo estelar ---
     const textureLoader = new THREE_NS.TextureLoader();
-    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', () => console.log('✨ Fondo de estrellas cargado'), undefined, (err) => console.warn('⚠️ Error al cargar fondo estelar:', err));
+    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', 
+        () => console.log('✨ Fondo de estrellas cargado'),
+        undefined, 
+        (err) => console.warn('⚠️ Error al cargar fondo estelar:', err)
+    );
     const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
     const starMaterial = new THREE_NS.MeshBasicMaterial({
         map: starTexture,
@@ -257,32 +569,38 @@ function initThree() {
     starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
     scene.add(starSphere);
 
+    // --- Grupo principal del sistema solar ---
+    solarSystemGroup = new THREE_NS.Group();
+    scene.add(solarSystemGroup);
+
     // --- Grupo para el Sol ---
     sunGroup = new THREE_NS.Group();
-    scene.add(sunGroup);
+    solarSystemGroup.add(sunGroup);
 
-    // Sol (Mallado visual. Usa MeshBasicMaterial para auto-iluminarse)
-    // --- Sol (auto-iluminado) ---
-    sunMesh = new THREE_NS.Mesh(
-        new THREE_NS.SphereGeometry(1.5, 64, 64),
-        new THREE_NS.MeshBasicMaterial({
-            map: textureLoader.load('static/textures/sol.jpg')
-        })
+    // ☀️ Sol (emite luz propia)
+    const sunGeometry = new THREE_NS.SphereGeometry(1.5, 64, 64);
+    const sunTexture = new THREE_NS.TextureLoader().load(
+        'static/textures/sol.jpg',
+        () => console.log('🪐 Textura de Sol cargada'),
+        undefined,
+        (err) => console.warn('⚠️ Error al cargar textura del Sol:', err)
     );
+    const sunMaterial = new THREE_NS.MeshBasicMaterial({
+        map: sunTexture,
+        toneMapped: false
+    });
+    sunMesh = new THREE_NS.Mesh(sunGeometry, sunMaterial);
     sunMesh.position.set(0, 0, 0);
     sunGroup.add(sunMesh);
 
-    // --- Luz del Sol para planetas ---
-    sunLight = new THREE_NS.PointLight(0xffffff, 2, 0); // luz puntual infinita
-    sunLight.position.set(0, 0, 0); // centro del sol
+    // 💡 Luz solar que ilumina la Tierra
+    sunLight = new THREE_NS.PointLight(0xffffff, 1.6, 100);
+    sunLight.position.set(0, 0, 0);
     sunLight.castShadow = true;
-    scene.add(sunLight);
+    sunGroup.add(sunLight);
 
-    // AJUSTES CLAVE DE SOMBRA
     sunLight.shadow.mapSize.width = 4096; 
     sunLight.shadow.mapSize.height = 4096;
-
-    // Ajuste del frustum para cubrir la órbita de la Tierra
     const d = 8; 
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
@@ -292,14 +610,12 @@ function initThree() {
     sunLight.shadow.camera.far = 20; 
     sunLight.shadow.bias = -0.0001; 
 
-    sunGroup.add(sunLight);
-
     // --- Grupo para la Tierra ---
     earthGroup = new THREE_NS.Group();
     earthGroup.position.set(sunOrbitRadius, 0, 0); 
     sunGroup.add(earthGroup);
 
-    // Tierra
+    // 🌍 Tierra
     earthMesh = createPlanet({
         name: 'Tierra',
         radius: 0.7,
@@ -307,7 +623,7 @@ function initThree() {
     });
     earthGroup.add(earthMesh);
 
-    // Nubes
+    // ☁️ Nubes
     const cloudsMesh = createPlanet({
         name: 'Nubes',
         texturePath: 'static/textures/fair_clouds_4k.png',
@@ -321,7 +637,7 @@ function initThree() {
     cloudsMesh.receiveShadow = false;
     earthMesh.add(cloudsMesh);
 
-    // Luna
+    // 🌕 Luna
     moonMesh = createPlanet({
         name: 'Luna',
         texturePath: 'static/textures/luna.jpg',
@@ -333,61 +649,28 @@ function initThree() {
     moonMesh.position.set(moonOrbitRadius, 0.5, 0);
     earthMesh.add(moonMesh);
 
-    // --- Luz ambiental general ---
+    // --- Luz ambiental ---
     scene.add(new THREE_NS.AmbientLight(0x888888, 1.5)); 
 
-    // --- Controles 3D y animación ---
+    // --- Ajuste inicial de la vista ---
+    solarSystemGroup.rotation.x = 0.3;
+    solarSystemGroup.rotation.y = 0.8;
+
+    // --- Controles y animación ---
     add3DControls(); 
-    setupFollowButton(); // Configura el botón de seguimiento
+    setupFollowButton();
+    setupResetSystemButton();
     animate();
 }
 
-// --- Controles de mouse/arrastre ---
-function add3DControls() {
-    let prevMouseX = 0, prevMouseY = 0;
 
-    threeContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-        isFollowingEarth = false; // Detener seguimiento al intentar arrastrar
-        const button = document.getElementById('followEarthButton');
-        if (button) button.textContent = 'Centrar en Tierra 🌍';
-    });
 
-    threeContainer.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - prevMouseX;
-        const deltaY = e.clientY - prevMouseY;
-
-        rotVelY = deltaX * rotationSpeedFactor; 
-        rotVelX = deltaY * rotationSpeedFactor;
-
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-
-    window.addEventListener('resize', () => {
-        const w = threeContainer.clientWidth || 600;
-        const h = threeContainer.clientHeight || 400;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
-    });
-}
-
-// --- Configuración del botón de seguimiento ---
+// --- Botón de seguimiento ---
 function setupFollowButton() {
     const button = document.createElement('button');
     button.textContent = 'Centrar en Tierra 🌍';
     button.id = 'followEarthButton';
     
-    // Estilo CSS básico para que no estorbe (Añadido al body)
     button.style.position = 'absolute';
     button.style.bottom = '10px';
     button.style.left = '10px';
@@ -405,15 +688,85 @@ function setupFollowButton() {
         isFollowingEarth = !isFollowingEarth;
         if (isFollowingEarth) {
             button.textContent = 'Dejar de Seguir';
-            // Al iniciar el seguimiento, establecemos una posición de cámara inicial
             camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
-            
         } else {
             button.textContent = 'Centrar en Tierra 🌍';
-            // Volvemos a la vista general
             camera.position.set(0, 0, 15);
             camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
         }
+    });
+}
+
+// --- Botón para reiniciar el Sistema Solar ---
+function setupResetSystemButton() {
+    const button = document.createElement('button');
+    button.textContent = 'Reiniciar Sistema Solar 🔄';
+    button.id = 'resetSystemButton';
+
+    // Estilo (junto al botón de seguir Tierra)
+    button.style.position = 'absolute';
+    button.style.bottom = '10px';
+    button.style.left = '180px';
+    button.style.padding = '8px 15px';
+    button.style.zIndex = '1000';
+    button.style.backgroundColor = 'rgba(70, 130, 180, 0.8)';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+
+    document.body.appendChild(button);
+
+    button.addEventListener('click', () => {
+        if (!solarSystemGroup) return;
+
+        // 🔄 Reiniciar el sistema solar completo
+        solarSystemGroup.rotation.set(0, 0, 0);
+
+        // 🔄 Reiniciar variables globales de movimiento
+        sunAngle = 0;
+        moonAngle = 0;
+        rotVelX = 0;
+        rotVelY = 0;
+
+        // 🔄 Reiniciar también la rotación local de la Tierra
+        if (earthGroup) {
+            earthGroup.rotation.set(0, 0, 0);
+        }
+
+        // 🔄 Reiniciar la posición de la Luna (por seguridad)
+        if (moonMesh) {
+            moonMesh.position.set(moonOrbitRadius, 0.5, 0);
+        }
+
+        // Si estamos siguiendo la Tierra 🌍
+        if (isFollowingEarth) {
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Dejar de Seguir';
+
+            // Mantener cámara centrada en la Tierra
+            const earthPosition = new THREE_NS.Vector3();
+            earthGroup.getWorldPosition(earthPosition);
+
+            // Definir el punto relativo de cámara (1 unidad arriba y 4 atrás)
+            const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
+
+            // Calcular rotación actual del sistema solar
+            const matrix = new THREE_NS.Matrix4().extractRotation(solarSystemGroup.matrixWorld);
+            relativeOffset.applyMatrix4(matrix);
+
+            // Reposicionar la cámara manteniendo el enfoque
+            camera.position.copy(earthPosition).add(relativeOffset);
+            camera.lookAt(earthPosition);
+        } else {
+            // Si no estamos centrados en la Tierra, volver a vista general
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Centrar en Tierra 🌍';
+            camera.position.set(0, 0, 15);
+            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
+        }
+
+        console.log('🌞 Sistema Solar y Tierra reiniciados.');
     });
 }
 
@@ -426,7 +779,6 @@ function animate() {
         return;
     }
 
-
     // 🌕 Revolución de la Luna
     moonAngle += moonOrbitSpeed;
     moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
@@ -437,66 +789,42 @@ function animate() {
     sunAngle += sunOrbitSpeed;
     sunGroup.rotation.y = sunAngle; 
     
-    // 🔄 LÓGICA DE ROTACIÓN MANUAL/AUTOMÁTICA DE LA TIERRA
+    // 🔄 Rotación manual/automática del sistema solar
     if (isDragging) {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
     } else {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
-        // Desaceleración
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
+
         rotVelX *= rotationDamping; 
         rotVelY *= rotationDamping;
-        
-        // Rotación automática 
+
         if (Math.abs(rotVelY) < 0.0001) {
-             earthGroup.rotation.y += 0.001; 
+            solarSystemGroup.rotation.y += 0.0005; 
         }
     }
 
-  if (orbitControls && typeof orbitControls.update === 'function') {
-    orbitControls.update();
-  }
+    if (orbitControls && typeof orbitControls.update === 'function') {
+        orbitControls.update();
+    }
 
-  // Revolución de la Luna alrededor de la Tierra
-  moonAngle += moonOrbitSpeed;
-  moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
-  moonMesh.position.z = Math.sin(moonAngle) * moonOrbitRadius;
-  // Inclinación orbital de la Luna (aproximadamente 5 grados)
-  moonMesh.position.y = Math.sin(moonAngle) * 0.2;
-
-
-    // 🚀 LÓGICA DE SEGUIMIENTO DE LA TIERRA
+    // 🚀 Seguimiento de la Tierra
     if (isFollowingEarth) {
-        // Obtenemos la posición global de la Tierra
         const earthPosition = new THREE_NS.Vector3();
         earthGroup.getWorldPosition(earthPosition);
-
-        // Definimos un punto de vista relativo a la Tierra (ej: 4 unidades detrás)
-        const relativeOffset = new THREE_NS.Vector3(0, 1, 4); 
-        
-        // Creamos una matriz de transformación a partir de la rotación del grupo Sol
+        const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
         const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
-
-        // Aplicamos la rotación orbital del sol (que contiene a la tierra) al offset
-        relativeOffset.applyMatrix4(matrix); 
-        
-        // Posicionamos la cámara: Posición de la Tierra + Offset rotado
+        relativeOffset.applyMatrix4(matrix);
         camera.position.copy(earthPosition).add(relativeOffset);
-        
-        // Apuntamos la cámara a la Tierra
         camera.lookAt(earthPosition);
     }
-    
+
     // 🌌 Movimiento lento del fondo
     starSphere.rotation.y += 0.00005;
 
-    // ☀️ Rotación lenta del Sol (decorativo)
-    if (sunMesh) {
-        sunMesh.rotation.y += 0.0005;
-    }
+    // ☀️ Rotación del Sol
+    if (sunMesh) sunMesh.rotation.y += 0.0005;
 
     renderer.render(scene, camera);
 }
@@ -632,6 +960,7 @@ function impactFlash(positionVec3) {
 
 function add3DControls() {
   if (!THREE_NS || !renderer || !camera) return;
+
   const ControlsCtor = THREE_NS.OrbitControls;
   if (!ControlsCtor) {
     console.warn('OrbitControls no está disponible. Usando controles básicos.');
@@ -649,9 +978,18 @@ function add3DControls() {
       if (!isDragging) return;
       const deltaX = event.clientX - prevX;
       const deltaY = event.clientY - prevY;
-      earthGroup.rotation.y += deltaX * 0.01;
-      earthGroup.rotation.x += deltaY * 0.01;
-      starSphere.rotation.y -= deltaX * 0.002;
+
+      if (isFollowingEarth) {
+        // 🔹 Si estamos centrados en la Tierra, rotar solo la Tierra
+        earthGroup.rotation.y += deltaX * 0.01;
+        earthGroup.rotation.x += deltaY * 0.01;
+      } else {
+        // 🔹 Si no, rotar todo el sistema solar
+        solarSystemGroup.rotation.y += deltaX * 0.01;
+        solarSystemGroup.rotation.x += deltaY * 0.01;
+      }
+
+      starSphere.rotation.y -= deltaX * 0.002;        // efecto sutil en estrellas
       starSphere.rotation.x -= deltaY * 0.002;
       prevX = event.clientX;
       prevY = event.clientY;
@@ -682,6 +1020,7 @@ function add3DControls() {
   orbitControls.addEventListener('start', () => { isDragging = true; });
   orbitControls.addEventListener('end', () => { isDragging = false; });
 }
+
 
 function onResize() {
   if (!renderer || !camera) return;
@@ -734,6 +1073,205 @@ function hashStringToSeed(str) {
 function toNumber(value, fallback = NaN) {
   const parsed = typeof value === 'number' ? value : parseFloat(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function pickFiniteNumber(...values) {
+  for (const value of values) {
+    const numeric = toNumber(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+}
+
+function extractOrbitalParameters(item) {
+  if (!item) return { a: null, e: null, inc: null };
+  const raw = item.raw || {};
+  const a = pickFiniteNumber(raw.a, raw.semi_major_axis, raw.semiMajorAxis, item.a);
+  const e = pickFiniteNumber(raw.e, raw.eccentricity, item.e);
+  const inc = pickFiniteNumber(raw.i, raw.i_deg, raw.inclination, item.i);
+  return { a, e, inc };
+}
+
+// ========== FUNCIÓN DE PROBABILIDAD DE IMPACTO (MÉTODO DE ÖPIK) ==========
+function impactProbabilityAdvanced({
+  a, e, inc, at = 1.0, et = 0.0167,
+  Rt_km = 6371, Mt = 5.97219e24,
+  samples = 1000, useGravFocus = true,
+  GMsun = 1.32712440018e20, AU_m = 1.495978707e11
+} = {}) {
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) {
+    return { Pcoll: NaN, a, e, inc };
+  }
+
+  if (samples % 2 !== 0) samples++;
+  const i = inc * Math.PI / 180;
+  const Rt = Rt_km * 1000;
+  const G = 6.67430e-11;
+
+  function radiusRcoll(U, Ve) {
+    const ratio = Math.max(U, 1e-12);
+    return Rt * Math.sqrt(1 + (Ve * Ve) / (ratio * ratio));
+  }
+
+  function V_target_at_r(rho_AU) {
+    const r = rho_AU * AU_m;
+    const atSI = at * AU_m;
+    return Math.sqrt(Math.max(0, GMsun * (2 / r - 1 / atSI)));
+  }
+
+  function tisserand_rho(rho_AU) {
+    return (rho_AU / a) + 2 * Math.sqrt((a / rho_AU) * (1 - e * e)) * Math.cos(i);
+  }
+
+  const Ve = Math.sqrt(2 * G * Mt / Rt);
+
+  function integrand_nu(nu) {
+    const denom = 1 + et * Math.cos(nu);
+    if (Math.abs(denom) < 1e-12) return 0;
+    const rho = at * (1 - et * et) / denom;
+    const Vt = V_target_at_r(rho);
+    const T_r = tisserand_rho(rho);
+    const tmp = 3 - T_r;
+    if (tmp <= 0) return 0;
+    const U = Vt * Math.sqrt(tmp);
+    const Rcoll = useGravFocus ? radiusRcoll(U, Ve) : Rt;
+    const bracket = 2 - (rho / a) - (a / rho) * (1 - e * e);
+    if (bracket <= 0) return 0;
+    const prefactor = 1 / (4 * Math.PI * Math.sin(i));
+    const Rcoll_over_at_sq = (Rcoll / (at * AU_m)) ** 2;
+    const factor_speed = U * Math.sqrt(rho * AU_m) / Math.sqrt(GMsun * (1 - et * et));
+    const PE_single = prefactor * Rcoll_over_at_sq * factor_speed / Math.sqrt(bracket);
+    return 4 * PE_single;
+  }
+
+  const a_nu = 0;
+  const b_nu = Math.PI;
+  const n = samples;
+  const h = (b_nu - a_nu) / n;
+  let integral = 0;
+
+  for (let k = 0; k <= n; k++) {
+    const nu = a_nu + k * h;
+    const y = integrand_nu(nu);
+    if (k === 0 || k === n) integral += y;
+    else if (k % 2 === 1) integral += 4 * y;
+    else integral += 2 * y;
+  }
+
+  integral *= (h / 3);
+  const Pcoll = integral / Math.PI;
+
+  return { Pcoll, a, e, inc, at, et, Rt_km, Mt, useGravFocus, samples };
+}
+
+function computeImpactProbabilityValue(a, e, inc) {
+  if (typeof impactProbabilityAdvanced !== 'function') return null;
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) return null;
+  try {
+    const result = impactProbabilityAdvanced({ a, e, inc });
+    if (result && typeof result === 'object') {
+      if (Number.isFinite(result.Pcoll)) return result.Pcoll;
+      if (Number.isFinite(result.pcoll)) return result.pcoll;
+    }
+    if (Number.isFinite(result)) return result;
+  } catch (error) {
+    console.error('Error calculando la probabilidad de impacto:', error);
+  }
+  return null;
+}
+
+function updateImpactProbabilityForItem(item, { source = 'update' } = {}) {
+  const { a, e, inc } = extractOrbitalParameters(item);
+  const probability = computeImpactProbabilityValue(a, e, inc);
+  outputProbabilityDebug(probability, source);
+}
+
+// Unifica mapeo -> cálculo -> visualización con logs
+function computeAndDisplayImpactProbability(selectedObject, opts = {}) {
+  const { source = 'handler' } = opts;
+  // 1. Verificar el objeto seleccionado
+  console.log(`[${source}] 1. Objeto seleccionado:`, selectedObject);
+  if (!selectedObject) {
+    outputProbabilityDebug(null, source);
+    return;
+  }
+
+  // 2. Mapear y convertir parámetros (a, e, inc)
+  const raw = selectedObject && selectedObject.raw ? selectedObject.raw : selectedObject;
+  const parseNum = (v) => {
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  let a = parseNum(raw.semi_major_axis);
+  if (isNaN(a)) a = parseNum(raw.a);
+  if (isNaN(a)) a = parseNum(selectedObject.a);
+  if (isNaN(a)) a = parseNum(raw.q_au_2);
+
+  let e = parseNum(raw.eccentricity);
+  if (isNaN(e)) e = parseNum(raw.e);
+  if (isNaN(e)) e = parseNum(selectedObject.e);
+
+  let inc = parseNum(raw.inclination);
+  if (isNaN(inc)) inc = parseNum(raw.i);
+  if (isNaN(inc)) inc = parseNum(raw.i_deg);
+  if (isNaN(inc)) inc = parseNum(selectedObject.i);
+
+  if ((isNaN(a) || a <= 0) && Number.isFinite(e)) {
+    const q = parseNum(raw.q_au_1);
+    if (Number.isFinite(q)) {
+      const denom = Math.max(1e-6, 1 - e);
+      a = q / denom;
+    }
+  }
+
+  const params = { a, e, inc };
+  console.log(`[${source}] 2. Parámetros para la función:`, params);
+
+  // 3. Calcular y registrar el resultado crudo
+  let result = null;
+  try {
+    result = impactProbabilityAdvanced(params);
+  } catch (err) {
+    console.error(`[${source}] Error llamando a impactProbabilityAdvanced:`, err);
+    result = null;
+  }
+
+  // 4. Mostrar el resultado en la UI
+  let valueToShow = null;
+  if (typeof result === 'number' && Number.isFinite(result)) {
+    valueToShow = result;
+  } else if (result && typeof result === 'object') {
+    const candidate = Number.isFinite(result?.Pcoll) ? result.Pcoll
+                    : Number.isFinite(result?.pcoll) ? result.pcoll
+                    : undefined;
+    if (Number.isFinite(candidate)) valueToShow = candidate;
+  }
+
+  outputProbabilityDebug(valueToShow, source);
+}
+
+function outputProbabilityDebug(probability, source = 'debug') {
+  const label = `[${source}] Debug - Probabilidad de Impacto (%):`;
+  if (Number.isFinite(probability)) {
+    const pct = probability;
+    const formatted = `${pct.toExponential(4)}%`;
+    if (probabilityDebugOut) probabilityDebugOut.textContent = formatted;
+    console.log(label, formatted);
+  } else {
+    if (probabilityDebugOut) probabilityDebugOut.textContent = '--';
+    console.log(label, '--');
+  }
+}
+
+function getCurrentSelectedItem() {
+  if (Number.isInteger(currentObjectIndex) && currentObjectIndex >= 0 && filteredCatalog[currentObjectIndex]) {
+    return filteredCatalog[currentObjectIndex];
+  }
+  if (objectSelect) {
+    const idx = Number(objectSelect.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) return filteredCatalog[idx];
+  }
+  return null;
 }
 
 function rotationPeriodToViewerSpeed(rotationPeriodHours) {
@@ -839,12 +1377,15 @@ function normalizeCometRecord(record, index = 0) {
   };
 }
 
-function setSelectLoading(selectEl, message) {
+function setSelectLoading(selectEl, messageKey) {
   if (!selectEl) return;
   selectEl.innerHTML = '';
   const option = document.createElement('option');
   option.value = '';
-  option.textContent = message;
+  if (messageKey) {
+    option.setAttribute('data-i18n', messageKey);
+    option.textContent = translate(messageKey) || messageKey;
+  }
   selectEl.appendChild(option);
   selectEl.disabled = true;
 }
@@ -864,11 +1405,15 @@ function updateObjectSummary(objectData) {
     objectSummary.textContent = '--';
     return;
   }
-  const typeLabel = objectData.type === 'comet' ? 'Cometa' : 'Asteroide';
+  const typeKey = objectData.type === 'comet' ? 'summary.type.comet' : 'summary.type.asteroid';
+  const typeLabel = translate(typeKey) || (objectData.type === 'comet' ? 'Cometa' : 'Asteroide');
   const diameter = Number.isFinite(objectData.diameterKm) ? `${objectData.diameterKm.toFixed(1)} km` : 'N/D';
   const eccentricity = Number.isFinite(objectData.e) ? objectData.e.toFixed(3) : 'N/D';
   const semiMajor = Number.isFinite(objectData.a) ? `${objectData.a.toFixed(3)} UA` : 'N/D';
-  objectSummary.textContent = `${typeLabel} • Diámetro: ${diameter} • a: ${semiMajor} • e: ${eccentricity}`;
+  const diameterLabel = translate('summary.diameter') || 'Diámetro';
+  const semiMajorLabel = translate('summary.semiMajor') || 'a';
+  const eccentricityLabel = translate('summary.eccentricity') || 'e';
+  objectSummary.textContent = `${typeLabel} • ${diameterLabel}: ${diameter} • ${semiMajorLabel}: ${semiMajor} • ${eccentricityLabel}: ${eccentricity}`;
 }
 
 function populateObjectSelect() {
@@ -876,7 +1421,7 @@ function populateObjectSelect() {
   suppressDatasetEvents = true;
   objectSelect.innerHTML = '';
   if (!filteredCatalog.length) {
-    setSelectLoading(objectSelect, 'Sin datos disponibles');
+    setSelectLoading(objectSelect, 'option.emptyCatalog');
     suppressDatasetEvents = false;
     return;
   }
@@ -893,21 +1438,23 @@ function populateObjectSelect() {
 function formatObjectDetails(objectData) {
   if (!objectData) return '';
   const lines = [];
-  lines.push(`Nombre: ${objectData.name}`);
-  lines.push(`Tipo: ${objectData.type === 'comet' ? 'Cometa' : 'Asteroide'}`);
-  if (Number.isFinite(objectData.diameterKm)) lines.push(`Diámetro estimado: ${objectData.diameterKm.toFixed(2)} km`);
-  if (Number.isFinite(objectData.density)) lines.push(`Densidad modelo: ${Math.round(objectData.density)} kg/m³`);
-  if (Number.isFinite(objectData.rotation_period)) lines.push(`Periodo de rotación aprox.: ${objectData.rotation_period.toFixed(1)} h`);
-  if (Number.isFinite(objectData.velocity)) lines.push(`Velocidad estimada: ${objectData.velocity.toFixed(1)} km/s`);
-  if (Number.isFinite(objectData.a)) lines.push(`Semieje mayor (a): ${objectData.a.toFixed(3)} UA`);
-  if (Number.isFinite(objectData.e)) lines.push(`Excentricidad (e): ${objectData.e.toFixed(3)}`);
-  if (Number.isFinite(objectData.i)) lines.push(`Inclinación (i): ${objectData.i.toFixed(2)}°`);
-  if (Number.isFinite(objectData.omega)) lines.push(`Nodo ascendente (Ω): ${objectData.omega.toFixed(2)}°`);
-  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`Arg. del perihelio (ω): ${objectData.argPeriapsis.toFixed(2)}°`);
+  lines.push(`${translate('details.name') || 'Nombre'}: ${objectData.name}`);
+  const typeKeyDetails = objectData.type === 'comet' ? 'details.type.comet' : 'details.type.asteroid';
+  const typeValue = translate(typeKeyDetails) || (objectData.type === 'comet' ? 'Cometa' : 'Asteroide');
+  lines.push(`${translate('details.type') || 'Tipo'}: ${typeValue}`);
+  if (Number.isFinite(objectData.diameterKm)) lines.push(`${translate('details.estimatedDiameter') || 'Diámetro estimado'}: ${objectData.diameterKm.toFixed(2)} km`);
+  if (Number.isFinite(objectData.density)) lines.push(`${translate('details.modelDensity') || 'Densidad modelo'}: ${Math.round(objectData.density)} kg/m³`);
+  if (Number.isFinite(objectData.rotation_period)) lines.push(`${translate('details.rotationPeriod') || 'Periodo de rotación aprox.'}: ${objectData.rotation_period.toFixed(1)} ${translate('details.rotationHours') || 'h'}`);
+  if (Number.isFinite(objectData.velocity)) lines.push(`${translate('details.velocity') || 'Velocidad estimada'}: ${objectData.velocity.toFixed(1)} km/s`);
+  if (Number.isFinite(objectData.a)) lines.push(`${translate('details.semiMajor') || 'Semieje mayor (a)'}: ${objectData.a.toFixed(3)} UA`);
+  if (Number.isFinite(objectData.e)) lines.push(`${translate('details.eccentricity') || 'Excentricidad (e)'}: ${objectData.e.toFixed(3)}`);
+  if (Number.isFinite(objectData.i)) lines.push(`${translate('details.inclination') || 'Inclinación (i)'}: ${objectData.i.toFixed(2)}°`);
+  if (Number.isFinite(objectData.omega)) lines.push(`${translate('details.ascendingNode') || 'Nodo ascendente (Ω)'}: ${objectData.omega.toFixed(2)}°`);
+  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`${translate('details.argPeriapsis') || 'Arg. del perihelio (ω)'}: ${objectData.argPeriapsis.toFixed(2)}°`);
   const period = toNumber(objectData.raw?.p_yr);
-  if (Number.isFinite(period)) lines.push(`Período orbital: ${period.toFixed(2)} años`);
+  if (Number.isFinite(period)) lines.push(`${translate('details.orbitalPeriod') || 'Período orbital'}: ${period.toFixed(2)} ${translate('units.years') || 'años'}`);
   const discoveryRaw = objectData.discoveryDate || objectData.raw?.discovery_date || objectData.raw?.disc_date || objectData.raw?.discoveryDate;
-  if (discoveryRaw) lines.push(`Descubierto: ${discoveryRaw}`);
+  if (discoveryRaw) lines.push(`${translate('details.discovery') || 'Descubierto'}: ${discoveryRaw}`);
   return lines.join('\n');
 }
 
@@ -948,7 +1495,7 @@ function applyObjectToViewer(objectData) {
   updateViewerRotationSpeed();
 }
 
-function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false } = {}) {
+function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false, updateProbability = true } = {}) {
   if (!Array.isArray(filteredCatalog) || !filteredCatalog[index]) return;
   currentObjectIndex = index;
   const selected = filteredCatalog[index];
@@ -964,6 +1511,9 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   }
   if (updateDetails && apiAsteroidDetails) {
     apiAsteroidDetails.value = formatObjectDetails(selected);
+  }
+  if (updateProbability) {
+    updateImpactProbabilityForItem(selected, { source: 'active-object' });
   }
 }
 
@@ -1027,7 +1577,8 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectIndex = null;
     currentObjectId = null;
     updateObjectSummary(null);
-    if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    if (apiAsteroidDetails) apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
+    updateImpactProbabilityForItem(null, { source: 'filters' });
     return;
   }
 
@@ -1074,8 +1625,8 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   currentDatasetKey = key;
   isCatalogLoading = true;
   updateDatasetRadios(key);
-  setSelectLoading(objectSelect, 'Cargando catálogo...');
-  setSelectLoading(apiAsteroidSelect, 'Cargando catálogo...');
+  setSelectLoading(objectSelect, 'option.loadingCatalog');
+  setSelectLoading(apiAsteroidSelect, 'option.loadingCatalog');
   if (apiAsteroidDetails) apiAsteroidDetails.value = '';
 
   try {
@@ -1104,8 +1655,16 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
 if (objectSelect) {
   objectSelect.addEventListener('change', () => {
     if (suppressDatasetEvents) return;
-    const idx = Number(objectSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
+    const value = objectSelect.value;
+    const idx = Number(value);
+    if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+      updateImpactProbabilityForItem(null, { source: 'dropdown' });
+      return;
+    }
+
+    const selectedObject = filteredCatalog[idx];
+    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true, updateProbability: false });
+    computeAndDisplayImpactProbability(selectedObject, { source: 'dropdown' });
   });
 }
 
@@ -1122,6 +1681,18 @@ datasetViewerRadios.forEach((radio) => {
     switchDataset(radio.value, { origin: 'viewer', forceReload: true });
   });
 });
+
+if (document.querySelectorAll('input[name="datasetViewer"]').length > 0) {
+  document.querySelectorAll('input[name="datasetViewer"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      if (this.value === 'asteroids') {
+        switchDataset('asteroids', { origin: 'viewer', forceReload: false });
+      } else {
+        switchDataset('comets', { origin: 'viewer', forceReload: false });
+      }
+    });
+  });
+}
 
 [
   [filterNameInput, ['input']],
@@ -1303,6 +1874,7 @@ function initAsteroidViewerThree() {
     asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
   }
+
   const width = asteroidCanvas.clientWidth;
   const height = asteroidCanvas.clientHeight;
   avRenderer = new THREE_NS.WebGLRenderer({ antialias: true });
@@ -1312,9 +1884,29 @@ function initAsteroidViewerThree() {
   asteroidCanvas.appendChild(avRenderer.domElement);
 
   avScene = new THREE_NS.Scene();
-  avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
-  avCamera.position.set(0, 0, 3);
 
+  avCamera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 1000);
+  avCamera.position.set(0, 0, 3);
+  avScene.add(avCamera);
+
+  // Fondo de estrellas
+  const textureLoader = new THREE_NS.TextureLoader();
+  const starTexture = textureLoader.load(
+    'static/textures/nocheHD.jpg',
+    () => console.log('✨ Fondo de estrellas cargado'),
+    undefined,
+    (err) => console.warn('⚠️ Error al cargar fondo de estrellas:', err)
+  );
+
+  const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
+  const starMaterial = new THREE_NS.MeshBasicMaterial({
+    map: starTexture,
+    side: THREE_NS.BackSide,
+  });
+  const starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
+  avScene.add(starSphere);
+
+  // Luces
   const ambient = new THREE_NS.AmbientLight(0xffffff, 0.3);
   avScene.add(ambient);
 
@@ -1330,36 +1922,193 @@ function initAsteroidViewerThree() {
   rimLight.position.set(-2, 1, -3);
   avScene.add(rimLight);
 
-  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed: meteoriteState.seed });
-  updateViewerRotationSpeed();
+  // Asteroide procedural con textura adaptada
+  function createAsteroidWithTexture(diameterKm, seed) {
+    const radius = diameterToSceneRadius(diameterKm);
+    const geometry = new THREE_NS.SphereGeometry(radius, 96, 96);
+    const positions = geometry.attributes.position;
+    const random = seededRandom(seed);
+    const offsetX = random() * 100;
+    const offsetY = random() * 100;
+    const offsetZ = random() * 100;
+
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const z = positions.getZ(i);
+
+      const noise1 = Math.sin((x + offsetX) * 1.5 + y * 0.8) * Math.cos(z * 1.2);
+      const noise2 = Math.sin(y * 1.8 + (z + offsetY) * 1.0) * Math.cos(x * 1.5);
+      const noise3 = Math.sin((z + offsetZ) * 1.3 + x * 1.1) * Math.cos(y * 1.6);
+      const combinedNoise = noise1 * 0.35 + noise2 * 0.35 + noise3 * 0.3;
+      const craterNoise = Math.sin(x * 3) * Math.sin(y * 3) * Math.sin(z * 3);
+      const displacement = combinedNoise * 0.25 + craterNoise * 0.1;
+
+      const length = Math.sqrt(x * x + y * y + z * z) || 1;
+      const scale = 1 + displacement;
+      positions.setXYZ(
+        i,
+        (x / length) * radius * scale,
+        (y / length) * radius * scale,
+        (z / length) * radius * scale
+      );
+    }
+
+    geometry.computeVertexNormals();
+
+    // Cargar textura y adaptarla a la superficie
+    const asteroidTexture = textureLoader.load(
+      'static/textures/asteroide.jpg',
+      () => {},
+      undefined,
+      (err) => console.warn('⚠️ Error al cargar textura de asteroide:', err)
+    );
+    asteroidTexture.wrapS = THREE_NS.RepeatWrapping;
+    asteroidTexture.wrapT = THREE_NS.RepeatWrapping;
+    asteroidTexture.anisotropy = 4;
+
+    const material = new THREE_NS.MeshPhongMaterial({
+      map: asteroidTexture,
+      shininess: 5,
+      specular: 0x333333,
+    });
+
+    const mesh = new THREE_NS.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  // Crear el asteroide inicial
+  avAsteroid = createAsteroidWithTexture(meteoriteState.diameterKM, meteoriteState.seed);
+  avScene.add(avAsteroid);
+
+  // Cuando se regenere el meteorito, reemplazar el mesh y mantener la textura pegada
+  window.regenerateMeteorite = function (overrides = {}) {
+    meteoriteState = {
+      diameterKM: overrides.diameterKM !== undefined ? Number(overrides.diameterKM) : meteoriteState.diameterKM,
+      seed: overrides.seed !== undefined ? Number(overrides.seed) : meteoriteState.seed
+    };
+    if (!avScene) return;
+    disposeMesh(avAsteroid);
+    avAsteroid = createAsteroidWithTexture(meteoriteState.diameterKM, meteoriteState.seed);
+    avScene.add(avAsteroid);
+    updateViewerRotationSpeed();
+  };
 
   addAsteroidViewerControls();
   requestAnimationFrame(asteroidViewerAnimate);
 }
 
-let avRotSpeed = 0.01; // rad/frame
-function asteroidViewerAnimate() {
-  requestAnimationFrame(asteroidViewerAnimate);
-  if (avAsteroid) {
-    avAsteroid.rotation.y += avRotSpeed;
-  }
-  if (avRenderer && avScene && avCamera) avRenderer.render(avScene, avCamera);
+function addAsteroidViewerControls() {
+    if (!avRenderer) return;
+    const domElement = avRenderer.domElement;
+    
+    // Variables para el control de órbita
+    let isRotating = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    
+    // Configuración de la órbita
+    const orbit = {
+        theta: 0,    // Ángulo horizontal
+        phi: Math.PI / 2, // Ángulo vertical (empezamos mirando de frente)
+        radius: 3,   // Distancia de la cámara al asteroide
+        minRadius: 1.5,
+        maxRadius: 15,
+        minPhi: 0.1,
+        maxPhi: Math.PI - 0.1
+    };
+    
+    // Función para actualizar la posición de la cámara
+    function updateCameraPosition() {
+        // Convertir coordenadas esféricas a cartesianas
+        const x = orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+        const y = orbit.radius * Math.cos(orbit.phi);
+        const z = orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+        
+        avCamera.position.set(x, y, z);
+        avCamera.lookAt(0, 0, 0); // Mirar al centro donde está el asteroide
+    }
+    
+    // Inicializar posición de la cámara
+    updateCameraPosition();
+    
+    // Eventos del mouse
+    domElement.addEventListener('mousedown', (event) => {
+        isRotating = true;
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+        domElement.style.cursor = 'grabbing';
+    });
+    
+    domElement.addEventListener('mousemove', (event) => {
+        if (!isRotating) return;
+        
+        const deltaX = event.clientX - previousMousePosition.x;
+        const deltaY = event.clientY - previousMousePosition.y;
+        
+        // Sensibilidad de rotación
+        const sensitivity = 0.01;
+        
+        // Actualizar ángulos de órbita
+        orbit.theta -= deltaX * sensitivity;
+        orbit.phi -= deltaY * sensitivity;
+        
+        // Limitar ángulo vertical para evitar volteretas
+        orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi));
+        
+        // Actualizar posición de la cámara
+        updateCameraPosition();
+        
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+    });
+    
+    domElement.addEventListener('mouseup', () => {
+        isRotating = false;
+        domElement.style.cursor = 'grab';
+    });
+    
+    domElement.addEventListener('mouseleave', () => {
+        isRotating = false;
+        domElement.style.cursor = 'grab';
+    });
+    
+    // Zoom con rueda del mouse
+    domElement.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        
+        const zoomSpeed = 0.1;
+        const zoomDirection = event.deltaY > 0 ? -1 : 1;
+        
+        orbit.radius += zoomDirection * zoomSpeed;
+        orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius));
+        
+        updateCameraPosition();
+    });
+    
+    // Configurar cursor inicial
+    domElement.style.cursor = 'grab';
 }
 
-function addAsteroidViewerControls() {
-  if (!avRenderer) return;
-  const el = avRenderer.domElement;
-  let dragging = false, lastX = 0, lastY = 0;
-  el.style.cursor = 'grab';
-  el.addEventListener('pointerdown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; el.style.cursor = 'grabbing'; });
-  window.addEventListener('pointermove', (e)=>{
-    if (!dragging || !avAsteroid) return;
-    const dx = e.clientX - lastX; const dy = e.clientY - lastY;
-    avAsteroid.rotation.y += dx * 0.01; avAsteroid.rotation.x += dy * 0.01; lastX = e.clientX; lastY = e.clientY;
-  });
-  window.addEventListener('pointerup', ()=>{ dragging = false; el.style.cursor = 'grab'; });
-  el.addEventListener('wheel', (e)=>{ e.preventDefault(); const d = Math.sign(e.deltaY); avCamera.position.z = Math.max(1.5, Math.min(6, avCamera.position.z + d*0.2)); }, { passive: false });
+let avAutoRotate = true; // rad/frame
+function asteroidViewerAnimate() {
+  requestAnimationFrame(asteroidViewerAnimate);
+
+  // Rotación automática cuando no se está arrastrando
+  if (!avDragging) {
+    if (avAsteroid) {
+      avAsteroid.rotation.y += avRotSpeed;
+    }
+    // Rotación muy lenta del cielo (como en la Tierra)
+    if (starSphere) {
+      starSphere.rotation.y += avRotSpeed * 0.1; // Más lento que el asteroide
+    }
+  }
+
+  if (avRenderer && avScene && avCamera) {
+    avRenderer.render(avScene, avCamera);
+  }
 }
+
 
 function updateManualDisplay() {
   if (manDiameter && manDiameterValue) {
@@ -1401,58 +2150,95 @@ if (manRotation) {
 
 function populateApiSelect() {
   if (!apiAsteroidSelect) return;
-  suppressDatasetEvents = true;
+  
   apiAsteroidSelect.innerHTML = '';
-
-  if (!filteredCatalog.length) {
-    setSelectLoading(apiAsteroidSelect, 'Sin datos disponibles');
-    suppressDatasetEvents = false;
+  
+  // Usar el catálogo filtrado actual
+  if (!filteredCatalog || !filteredCatalog.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.setAttribute('data-i18n', 'message.noDataAvailable');
+    option.textContent = translate('message.noDataAvailable') || 'No hay datos disponibles';
+    apiAsteroidSelect.appendChild(option);
+    apiAsteroidSelect.disabled = true;
     return;
   }
-
-  filteredCatalog.forEach((item, idx) => {
+  
+  filteredCatalog.forEach((item, index) => {
     const opt = document.createElement('option');
-    opt.value = String(idx);
-    const diameterLabel = Number.isFinite(item.diameterKm) ? `Ø ${item.diameterKm.toFixed(1)} km` : 'Ø N/D';
-    const speedValue = Number.isFinite(item.velocity) ? item.velocity : estimateViewerSpeed(item);
-    const speedLabel = Number.isFinite(speedValue) ? `v ${speedValue.toFixed(1)} km/s` : 'v N/D';
-    opt.textContent = `${item.name} — ${diameterLabel}, ${speedLabel}`;
+    opt.value = String(index);
+    
+    // Formato consistente con el panel principal
+    const diameter = Number.isFinite(item.diameterKm) ? `${item.diameterKm.toFixed(1)}` : 'N/D';
+    const velocity = Number.isFinite(item.velocity) ? `${item.velocity.toFixed(1)}` : 'N/D';
+    
+    opt.textContent = `${item.name} — Ø ${diameter} km, v ${velocity} km/s`;
     apiAsteroidSelect.appendChild(opt);
   });
-
+  
   apiAsteroidSelect.disabled = false;
-  suppressDatasetEvents = false;
+  
+  // Seleccionar el objeto actual si existe, de lo contrario el primero
+  let selectedIndex = 0;
+  if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
+    selectedIndex = currentObjectIndex;
+  }
+  
+  apiAsteroidSelect.value = String(selectedIndex);
+  updateApiDetails();
 }
 
 function updateApiDetails() {
   if (!apiAsteroidSelect || !apiAsteroidDetails) return;
-  const idx = Number(apiAsteroidSelect.value || 0);
-  const objectData = filteredCatalog[idx];
-
-  if (!objectData) {
-    apiAsteroidDetails.value = 'No hay datos disponibles';
+  
+  const idx = Number(apiAsteroidSelect.value);
+  if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+    apiAsteroidDetails.value = translate('message.selectFromCatalog') || 'Selecciona un objeto del catálogo';
+    return;
+  }
+  
+  const object = filteredCatalog[idx];
+  if (!object) {
+    apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
     return;
   }
 
-  apiAsteroidDetails.value = formatObjectDetails(objectData);
-  setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: false });
+  // Usar la función de formato existente
+  apiAsteroidDetails.value = formatObjectDetails(object);
+  
+  // Actualizar el objeto activo globalmente
+  setActiveObjectByIndex(idx, { 
+    updateViewer: true, 
+    updateDetails: false, 
+    updateProbability: true 
+  });
 }
 
+// === FIN DEL REEMPLAZO ===
+
 if (apiAsteroidSelect) {
-  apiAsteroidSelect.addEventListener('change', () => {
-    if (suppressDatasetEvents) return;
-    const idx = Number(apiAsteroidSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
+  apiAsteroidSelect.addEventListener('change', function() {
+    updateApiDetails();
+    
+    // También actualizar la selección en el panel principal si es necesario
+    const idx = Number(this.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) {
+      setActiveObjectByIndex(idx, { 
+        updateViewer: true, 
+        updateDetails: false, 
+        updateProbability: false 
+      });
+    }
   });
 }
 
 function setViewerMode(mode) {
   viewerMode = mode;
-  updateDatasetRadios(currentDatasetKey);
+  const dict = translations[currentLanguage] || translations.es;
   if (mode === 'manual') {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');
-    modeToggle.textContent = 'Modo Manual';
+    if (modeToggle) modeToggle.textContent = dict['viewer.modeManual'] || 'Modo Manual';
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
     updateViewerRotationSpeed();
     regenerateMeteorite({
@@ -1462,9 +2248,18 @@ function setViewerMode(mode) {
   } else {
     manualControls.classList.add('hidden');
     apiControls.classList.remove('hidden');
-    modeToggle.textContent = 'Modo API';
+    if (modeToggle) modeToggle.textContent = dict['viewer.modeApi'] || 'Modo API';
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
+    
+    // Usar el catálogo actual en lugar de datos mock
     populateApiSelect();
+    
+    // Si hay un objeto seleccionado, cargar sus detalles
+    if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
+      const selectedObject = filteredCatalog[currentObjectIndex];
+      apiAsteroidDetails.value = formatObjectDetails(selectedObject);
+      computeAndDisplayImpactProbability(selectedObject, { source: 'viewer-mode' });
+    }
   }
 }
 
@@ -1521,7 +2316,136 @@ simulateBtn.addEventListener('click', () => {
   drawEffectZones(data.impactLat, data.impactLon, data.craterDiameterKM, data.effectZones);
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
+  map.removeControl(legend2);
+  legend2.addTo(map);
 });
+
+const accessibilityMenuButton = document.getElementById('accessibilityMenuButton');
+const accessibilityMenu = document.getElementById('accessibilityMenu');
+const faqModal = document.getElementById('faqModal');
+const faqOverlay = document.getElementById('faqOverlay');
+const faqCloseBtn = document.getElementById('faqCloseBtn');
+const faqOpenBtn = document.getElementById('faq-open-btn');
+
+function isMenuOpen() {
+  return accessibilityMenu && !accessibilityMenu.classList.contains('hidden');
+}
+
+function openAccessibilityMenu() {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  accessibilityMenu.classList.remove('hidden');
+  accessibilityMenuButton.setAttribute('aria-expanded', 'true');
+}
+
+function closeAccessibilityMenu() {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  accessibilityMenu.classList.add('hidden');
+  accessibilityMenuButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleAccessibilityMenu() {
+  if (!accessibilityMenu) return;
+  if (isMenuOpen()) closeAccessibilityMenu(); else openAccessibilityMenu();
+}
+
+function isFaqOpen() {
+  return faqModal && !faqModal.classList.contains('hidden');
+}
+
+function openFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  closeAccessibilityMenu();
+  setTimeout(() => {
+    if (faqCloseBtn) faqCloseBtn.focus();
+  }, 0);
+}
+
+function closeFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  setTimeout(() => {
+    if (faqOpenBtn) {
+      faqOpenBtn.focus();
+    } else if (accessibilityMenuButton) {
+      accessibilityMenuButton.focus();
+    }
+  }, 0);
+}
+
+if (accessibilityMenuButton) {
+  accessibilityMenuButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    toggleAccessibilityMenu();
+  });
+}
+
+document.addEventListener('click', (event) => {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  const withinMenu = accessibilityMenu.contains(event.target);
+  const isButton = accessibilityMenuButton.contains(event.target);
+  if (!withinMenu && !isButton) {
+    closeAccessibilityMenu();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    if (isFaqOpen()) {
+      closeFaqModal();
+      event.preventDefault();
+      return;
+    }
+    if (isMenuOpen()) {
+      closeAccessibilityMenu();
+      event.preventDefault();
+    }
+  }
+});
+
+if (faqOpenBtn) {
+  faqOpenBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    openFaqModal();
+  });
+}
+
+if (faqOverlay) {
+  faqOverlay.addEventListener('click', closeFaqModal);
+}
+
+if (faqCloseBtn) {
+  faqCloseBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeFaqModal();
+  });
+}
+
+document.querySelectorAll('[data-lang-option]').forEach((btn) => {
+  btn.addEventListener('click', (event) => {
+    event.preventDefault();
+    const lang = btn.getAttribute('data-lang-option');
+    setLanguage(lang);
+    closeAccessibilityMenu();
+  });
+});
+
+(function initializeLanguage() {
+  let initialLang = 'es';
+  try {
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (stored && translations[stored]) {
+      initialLang = stored;
+    } else {
+      const browserLang = (navigator.language || navigator.userLanguage || '').slice(0, 2);
+      if (translations[browserLang]) initialLang = browserLang;
+    }
+  } catch (_) {}
+  setLanguage(initialLang);
+  window.setLanguage = setLanguage;
+})();
 
 // Accesibilidad: botón de modo daltónico (toggle en <body>)
 (function(){
@@ -1537,5 +2461,213 @@ simulateBtn.addEventListener('click', () => {
     try {
       localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
     } catch (_) {}
+    closeAccessibilityMenu();
   });
 })();
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Inicializar el select del modo API cuando esté disponible
+  if (apiAsteroidSelect && viewerMode === 'api') {
+    setTimeout(() => {
+      populateApiSelect();
+    }, 100);
+  }
+});
+let craterCircle;
+
+// Parámetros de inicio
+function updateCraterDisplay() {
+    console.log('=== updateCraterDisplay START ===');
+    
+    // Switch to 2D map view
+    document.getElementById('globe3D').classList.add('hidden');
+    document.getElementById('map2D').classList.remove('hidden');
+    
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
+    
+    if (!impactMarker) {
+        alert('Por favor, haz clic en el mapa para seleccionar un punto de impacto');
+        return;
+    }
+    
+    const L_input = parseFloat(diameterInput.value);
+    const v_i = parseFloat(velocityInput.value) * 1000;
+    
+    // Get density from the input field
+    const phi_i = parseFloat(document.getElementById('density').value);
+    const phi_t = 2000;
+    const theta_deg = document.getElementById('theta') ? 
+                      parseFloat(document.getElementById('theta').value) : 45;
+    
+    console.log('Using density from input:', phi_i);
+    
+    console.log('Input values:', { L_input, v_i, phi_i, phi_t, theta_deg });
+    
+    // Calculate crater
+    const craterData = calculateCraterImpact(phi_i, phi_t, L_input, v_i, theta_deg);
+    
+    console.log('Crater data:', craterData);
+    console.log('D_fr:', craterData.D_fr);
+    
+    // Update results panel
+    document.getElementById('craterType').textContent = craterData.craterType;
+    document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
+    document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
+    document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);
+    document.getElementById('h_fr').textContent = craterData.h_fr > 0 ? craterData.h_fr.toFixed(2) : 'N/A';
+    
+    // Calculate energy
+    const mass = (4/3) * Math.PI * Math.pow(L_input/2, 3) * phi_i;
+    const energy_joules = 0.5 * mass * Math.pow(v_i, 2);
+    const energy_megatons = energy_joules / (4.184e15);
+    document.getElementById('energy').textContent = energy_megatons.toFixed(2);
+    
+    // Calculate crater radius and display on map
+    const craterRadius = craterData.D_fr / 2;
+    console.log('Crater radius (meters):', craterRadius);
+    console.log('Calling updateMapCrater...');
+    
+    updateMapCrater(craterRadius);
+    console.log('=== updateCraterDisplay END ===');
+}
+
+function updateMapCrater(craterRadius) {
+    console.log('=== updateMapCrater START ===');
+    console.log('Crater radius received:', craterRadius);
+    console.log('impactMarker:', impactMarker);
+    console.log('map object:', map);
+    
+    if (!impactMarker) {
+        console.error('No impact marker!');
+        return;
+    }
+    
+    // Remove old crater circle
+    if (craterCircle) {
+        console.log('Removing old crater circle');
+        map.removeLayer(craterCircle);
+    }
+    
+    const impactCoords = impactMarker.getLatLng();
+    console.log('Impact coordinates:', impactCoords);
+    
+    // Create crater circle
+    console.log('Creating circle with radius:', craterRadius);
+    craterCircle = L.circle(impactCoords, {
+        radius: craterRadius,
+        color: '#8B0000',
+        fillColor: '#8B0000',
+        fillOpacity: 0.5,
+        weight: 2
+    });
+    
+    console.log('Adding circle to map');
+    craterCircle.addTo(map);
+    
+    console.log('Circle added, bounds:', craterCircle.getBounds());
+    
+    // Zoom to crater
+    map.fitBounds(craterCircle.getBounds(), { padding: [50, 50] });
+    
+    console.log('=== updateMapCrater END ===');
+}
+
+function updateLegend(craterRadius) {
+    const legendDiv = document.querySelector('.legend'); // Adjust selector as needed
+    
+    if (!legendDiv) {
+        console.warn('Legend div not found');
+        return;
+    }
+    
+    legendDiv.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;">
+            <span style="width:12px;height:12px;background:rgba(139, 0, 0, 0.6);border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> 
+            Cráter (${(craterRadius/1000).toFixed(2)} km)
+        </div>
+    `;
+}
+
+// Make sure button listener is added AFTER the DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    const simulateBtn = document.getElementById('simulateBtn');
+    console.log('Simulate button:', simulateBtn); // Check if button exists
+    
+    if (simulateBtn) {
+        simulateBtn.addEventListener('click', function() {
+            console.log('Button clicked!');
+            updateCraterDisplay();
+        });
+    } else {
+        console.error('simulateBtn not found!');
+    }
+});
+
+// Dimensiones de cráter
+function calculateCraterImpact(phi_i, phi_t, L, v_i, theta_deg) {
+    const H = 8;
+    const Cd = 2;
+    const phi_0 = 1;
+    const theta = (theta_deg * Math.PI) / 180; // Convert to radians
+   
+    // Impactor yield strength
+    const Yi = Math.pow(10, 6) * Math.pow(10, 2.107 + 0.0624 * Math.sqrt(phi_i));
+   
+    // Strength parameter I (using L, not L0)
+    const I_f = 4.07 * ((Cd * H * Yi) / (phi_i * L * Math.pow(v_i, 2) * Math.sin(theta)));
+   
+    let L_final; // Renamed to avoid confusion
+   
+    if (I_f > 1) {
+        L_final = L;
+    } else {
+        // Breakup altitude
+        const z_o = -H * (Math.log(Yi / (phi_0 * Math.pow(v_i, 2))) + 1.308 - 0.314 * I_f - 1.303 * Math.sqrt(1 - I_f));
+       
+        // Density at breakup altitude
+        const phi_zo = phi_0 * Math.exp(-z_o / H);
+       
+        // Dispersion length (using L, not L0)
+        const l = L * Math.sin(theta) * Math.sqrt(phi_i / (Cd * phi_zo));
+       
+        // Final diameter (using L, not L0)
+        L_final = L * Math.sqrt(1 + Math.pow((2 * H / l), 2) * Math.pow((Math.exp((z_o - 0) / (2 * H)) - 1), 2));
+    }
+    
+    const g_E = 9.81;
+    // Transient crater calculations (using L_final, not L)
+    const D_tc = 1.161 * Math.pow(phi_i / phi_t, 1 / 3) * Math.pow(L_final, 0.78) *
+                 Math.pow(v_i, 0.44) * Math.pow(g_E, -0.22) *
+                 Math.pow(Math.sin(theta), 1 / 3);
+   
+    const d_tc = D_tc / (2 * Math.sqrt(2));
+    const V_tc = (Math.PI * Math.pow(D_tc, 3)) / (16 * Math.sqrt(2)) * 1e-9;
+    
+    let craterType, D_fr, d_fr, h_fr;
+    
+    if (D_tc <= 2560) {
+        craterType = 'Cráter simple';
+        D_fr = 1.25 * D_tc;
+        const V_br = 0.032 * Math.pow(D_fr, 3);
+        d_fr = 0.294 * Math.pow(D_fr, 0.301) * 100;
+        h_fr = 0.07 * (Math.pow(D_tc, 4) / Math.pow(D_fr, 3));
+    } else {
+        craterType = 'Cráter complejo';
+        const D_c = 3200;
+        D_fr = 1.17 * Math.pow(D_tc, 1.13) / Math.pow(D_c, 0.13);
+        d_fr = 0.4 * Math.pow(D_fr, 0.3);
+        h_fr = 0;
+    }
+    
+    return {
+        craterType,
+        D_tc,
+        d_tc,
+        V_tc,
+        D_fr,
+        d_fr,
+        h_fr
+    };
+}
