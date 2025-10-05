@@ -20,6 +20,10 @@ let moonAngle = 0;
 let moonOrbitRadius = 2;
 let moonOrbitSpeed = 0.01;
 let orbitControls = null;
+let currentImpactVelocity = null;
+if (typeof window !== 'undefined') {
+  window.currentImpactVelocity = null;
+}
 
 // UI
 const diameterInput = document.getElementById('diameter'); 
@@ -34,6 +38,7 @@ const energyOut = document.getElementById('energy');
 const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
+const impactProbabilityOut = document.getElementById('impactProbability');
 
 
 // Vistas
@@ -76,7 +81,7 @@ function updateSliderDisplays() {
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
   mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
 }
-[diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
+[diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
 
 // Leaflet: mapa de selección (pequeño)
@@ -513,6 +518,39 @@ function toNumber(value, fallback = NaN) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function pickFiniteNumber(...values) {
+  for (const value of values) {
+    const num = toNumber(value);
+    if (Number.isFinite(num)) return num;
+  }
+  return null;
+}
+
+function extractIndexFromId(id) {
+  if (typeof id !== 'string') return null;
+  const parts = id.split('-');
+  if (parts.length < 2) return null;
+  const idx = Number(parts[1]);
+  return Number.isFinite(idx) ? idx : null;
+}
+
+function getDatasetRecordForItem(item) {
+  if (!item) return null;
+  if (item.raw) return item.raw;
+  const datasetKey = item.type === 'comet' ? 'comets' : 'asteroids';
+  const dataset = getRawDatasetForKey(datasetKey);
+  if (!Array.isArray(dataset)) return null;
+  const indexFromId = extractIndexFromId(item.id);
+  if (Number.isInteger(indexFromId) && dataset[indexFromId]) {
+    return dataset[indexFromId];
+  }
+  const targetName = (item.name || '').toLowerCase();
+  return dataset.find((record) => {
+    const nameCandidate = (record?.full_name || record?.object_name || record?.name || '').toLowerCase();
+    return nameCandidate === targetName;
+  }) || null;
+}
+
 function rotationPeriodToViewerSpeed(rotationPeriodHours) {
   const hours = toNumber(rotationPeriodHours, 6);
   if (!Number.isFinite(hours) || hours <= 0) return 5;
@@ -881,8 +919,97 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
 if (objectSelect) {
   objectSelect.addEventListener('change', () => {
     if (suppressDatasetEvents) return;
-    const idx = Number(objectSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
+
+    const selectedValue = objectSelect.value;
+    if (selectedValue === '') {
+      if (impactProbabilityOut) impactProbabilityOut.textContent = '--';
+      currentImpactVelocity = null;
+      if (typeof window !== 'undefined') window.currentImpactVelocity = null;
+      return;
+    }
+
+    const idx = Number(selectedValue);
+    const normalizedItem = Number.isFinite(idx) ? filteredCatalog[idx] : filteredCatalog.find((item) => item?.id === selectedValue || item?.name === selectedValue);
+
+    if (!normalizedItem) {
+      if (impactProbabilityOut) impactProbabilityOut.textContent = '--';
+      currentImpactVelocity = null;
+      if (typeof window !== 'undefined') window.currentImpactVelocity = null;
+      return;
+    }
+
+    const targetIndex = Number.isFinite(idx) ? idx : filteredCatalog.indexOf(normalizedItem);
+    if (targetIndex < 0) {
+      if (impactProbabilityOut) impactProbabilityOut.textContent = '--';
+      currentImpactVelocity = null;
+      if (typeof window !== 'undefined') window.currentImpactVelocity = null;
+      return;
+    }
+
+    setActiveObjectByIndex(targetIndex, { updateViewer: false, updateDetails: true });
+
+    const datasetRecord = getDatasetRecordForItem(normalizedItem) || normalizedItem.raw || null;
+
+    const orbitalA = pickFiniteNumber(datasetRecord?.a, datasetRecord?.semi_major_axis, normalizedItem.a);
+    const orbitalE = pickFiniteNumber(datasetRecord?.e, normalizedItem.e);
+    const orbitalI = pickFiniteNumber(datasetRecord?.i, datasetRecord?.i_deg, datasetRecord?.inclination, normalizedItem.i);
+
+    let probabilityDisplay = '--';
+    if (typeof impactProbabilityAdvanced === 'function' && Number.isFinite(orbitalA) && Number.isFinite(orbitalE) && Number.isFinite(orbitalI)) {
+      try {
+        let probabilityValue = null;
+        if (impactProbabilityAdvanced.length >= 3) {
+          probabilityValue = impactProbabilityAdvanced(orbitalA, orbitalE, orbitalI);
+        } else {
+          probabilityValue = impactProbabilityAdvanced({ a: orbitalA, e: orbitalE, i: orbitalI });
+        }
+        if (Number.isFinite(probabilityValue)) {
+          probabilityDisplay = (probabilityValue * 100).toFixed(6);
+        }
+      } catch (error) {
+        probabilityDisplay = '--';
+      }
+    }
+    if (impactProbabilityOut) {
+      impactProbabilityOut.textContent = probabilityDisplay;
+    }
+
+    let impactVelocity = null;
+    if (typeof calculateImpactVelocity === 'function') {
+      const diameterMetersCandidate = pickFiniteNumber(datasetRecord?.diameter_m, datasetRecord?.diameterMeters, datasetRecord?.diameter_meters, normalizedItem.raw?.diameter_m);
+      let effectiveDiameter = Number.isFinite(diameterMetersCandidate) ? diameterMetersCandidate : null;
+      if (!Number.isFinite(effectiveDiameter)) {
+        const diameterKm = pickFiniteNumber(datasetRecord?.diameter_km, datasetRecord?.diameterKm, datasetRecord?.diameter, normalizedItem.diameterKm);
+        if (Number.isFinite(diameterKm)) {
+          effectiveDiameter = diameterKm * 1000;
+        }
+      }
+
+      const densityValue = pickFiniteNumber(datasetRecord?.density, normalizedItem.density, normalizedItem.raw?.density, 3000);
+      const entryAngleValue = pickFiniteNumber(datasetRecord?.entry_angle, datasetRecord?.entryAngle, datasetRecord?.theta, normalizedItem.entry_angle, normalizedItem.entryAngle, 45);
+      const initialVelocityValue = pickFiniteNumber(datasetRecord?.initial_velocity, datasetRecord?.initialVelocity, datasetRecord?.velocity, datasetRecord?.velocity_kms, normalizedItem.velocity, normalizedItem.raw?.velocity, 20);
+
+      if (Number.isFinite(effectiveDiameter) && Number.isFinite(densityValue) && Number.isFinite(entryAngleValue) && Number.isFinite(initialVelocityValue)) {
+        try {
+          const result = calculateImpactVelocity({
+            L: effectiveDiameter,
+            rho_p: densityValue,
+            theta_deg: entryAngleValue,
+            v_i: initialVelocityValue
+          });
+          if (Number.isFinite(result)) {
+            impactVelocity = result;
+          }
+        } catch (error) {
+          impactVelocity = null;
+        }
+      }
+    }
+
+    currentImpactVelocity = impactVelocity;
+    if (typeof window !== 'undefined') {
+      window.currentImpactVelocity = impactVelocity;
+    }
   });
 }
 
