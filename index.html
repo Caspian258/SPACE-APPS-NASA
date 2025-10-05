@@ -81,6 +81,26 @@
         <button id="show3D">Ver Globo 3D</button>
         <button id="show2D">Ver Mapa 2D</button>
       </div>
+
+      <div class="control-group" style="margin-top:12px;">
+        <label>Catálogo de objetos</label>
+        <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="radio" name="datasetMain" value="asteroids" checked /> Asteroides
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="radio" name="datasetMain" value="comets" /> Cometas
+          </label>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="objectSelect">Seleccionar objeto</label>
+        <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+          <option value="">Cargando catálogo...</option>
+        </select>
+        <div class="value small" id="objectSummary">--</div>
+      </div>
     </section>
 
     <!-- Visualization -->
@@ -168,6 +188,17 @@
         <!-- Controles: Modo API -->
         <div id="apiControls" class="hidden">
           <div class="control-group">
+            <label>Fuente de datos</label>
+            <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="radio" name="datasetViewer" value="asteroids" checked /> Asteroides
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="radio" name="datasetViewer" value="comets" /> Cometas
+              </label>
+            </div>
+          </div>
+          <div class="control-group">
             <label for="apiAsteroidSelect">Lista de asteroides (catálogo)</label>
             <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
           </div>
@@ -197,6 +228,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Three.js UMD estable para file:// (r149) -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.149.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="./database.js"></script>
   <script src="static/js/script.js"></script>
 </body>
 </html>
