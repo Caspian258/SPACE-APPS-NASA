@@ -1,3 +1,4 @@
+Antes de simulación meteorito falsa después de vistas 2d 3D
 // Versión Hackathon (frontend standalone)
 // - No hay llamadas al backend. Todo sucede en el navegador.
 // - Las funciones marcadas con // TODO: son plantillas para que el equipo inserte su modelo matemático.
@@ -157,20 +158,18 @@ let renderer, scene, camera;
 let earthMesh, moonMesh, sunMesh, starSphere;
 let earthGroup, sunGroup, sunLight;
 let isDragging = false;
-let rotVelX = 0, rotVelY = 0; 
-const rotationDamping = 0.95; 
-const rotationSpeedFactor = 0.005; 
+let rotVelX = 0, rotVelY = 0; // Velocidad de rotación manual (dependiente del cursor)
+const rotationDamping = 0.95; // Para desacelerar la rotación
+const rotationSpeedFactor = 0.005; // Factor de sensibilidad del arrastre
 // Contenedor para el Sol
-let sunAngle = 0; 
-const sunOrbitRadius = 5; 
-const sunOrbitSpeed = 0.002; 
+let sunAngle = 0; // ángulo de rotación orbital de la Tierra
+const sunOrbitRadius = 5; // distancia de la Tierra al Sol
+const sunOrbitSpeed = 0.002; // velocidad de revolución de la Tierra
 let isPaused = false;
+// Variables para la animación de la Luna
 
-// Variable para controlar el seguimiento de la Tierra
-let isFollowingEarth = false; 
-
-// Contenedor del DOM (USANDO NOMBRE ALTERNATIVO: threeContainer)
-const threeContainer = document.getElementById('globe3D') || { 
+// Contenedor del DOM (asumiendo que existe un elemento con id='globe3D')
+const globe3D = document.getElementById('globe3D') || { 
     clientWidth: 600, 
     clientHeight: 400, 
     innerHTML: '', 
@@ -197,7 +196,7 @@ function createPlanet({
         (err) => console.warn(`⚠️ Error al cargar textura de ${name}:`, err)
     );
 
-    // MeshPhongMaterial es esencial para que la luz y las sombras funcionen.
+    // Usar MeshPhongMaterial o MeshStandardMaterial es VITAL para que las luces funcionen
     const material = new THREE_NS.MeshPhongMaterial({
         map: texture,
         shininess,
@@ -220,21 +219,21 @@ function createPlanet({
 // --- Inicialización principal ---
 function initThree() {
     if (!THREE_NS) {
-        threeContainer.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
+        globe3D.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
         return;
     }
 
     // --- Configuración básica del render ---
-    const width = threeContainer.clientWidth || 600;
-    const height = threeContainer.clientHeight || 400;
+    const width = globe3D.clientWidth || 600;
+    const height = globe3D.clientHeight || 400;
 
     renderer = new THREE_NS.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE_NS.PCFSoftShadowMap;
-    threeContainer.innerHTML = '';
-    threeContainer.appendChild(renderer.domElement);
+    globe3D.innerHTML = '';
+    globe3D.appendChild(renderer.domElement);
 
     scene = new THREE_NS.Scene();
 
@@ -258,20 +257,20 @@ function initThree() {
     sunGroup = new THREE_NS.Group();
     scene.add(sunGroup);
 
-    // Sol (Mallado visual. Usa MeshBasicMaterial para auto-iluminarse)
+    // Sol (Usando MeshBasicMaterial para que brille y parezca una estrella)
     sunMesh = new THREE_NS.Mesh(
         new THREE_NS.SphereGeometry(1.5, 64, 64),
         new THREE_NS.MeshBasicMaterial({
             map: textureLoader.load('static/textures/sol.jpg'),
-            emissive: 0xffaa00, // Color de emisión
-            emissiveIntensity: 2 // Intensidad para que brille
+            emissive: 0xffaa00,
+            emissiveIntensity: 0.8
         })
     );
     sunMesh.position.set(0,0,0);
     sunGroup.add(sunMesh);
 
-    // LUZ DEL SOL: DirectionalLight (Solución para la iluminación) ☀️
-    sunLight = new THREE_NS.DirectionalLight(0xffffff, 15); 
+    // LUZ DEL SOL: DirectionalLight (Simula rayos paralelos, es la solución correcta) ☀️
+    sunLight = new THREE_NS.DirectionalLight(0xffffff, 3.5); 
     sunLight.position.set(0, 0, 0); 
     sunLight.castShadow = true;
 
@@ -287,7 +286,7 @@ function initThree() {
     sunLight.shadow.camera.bottom = -d;
     sunLight.shadow.camera.near = 1;
     sunLight.shadow.camera.far = 20; 
-    sunLight.shadow.bias = -0.0001; 
+    sunLight.shadow.bias = -0.0001; // Ayuda a evitar el 'shadow acne'
 
     sunGroup.add(sunLight);
 
@@ -299,7 +298,7 @@ function initThree() {
     // Tierra
     earthMesh = createPlanet({
         name: 'Tierra',
-        radius: 0.7,
+        radius: .7,
         texturePath: 'static/textures/planeta.jpg'
     });
     earthGroup.add(earthMesh);
@@ -331,33 +330,31 @@ function initThree() {
     earthMesh.add(moonMesh);
 
     // --- Luz ambiental general ---
-    scene.add(new THREE_NS.AmbientLight(0x888888, 1.5)); 
+    scene.add(new THREE_NS.AmbientLight(0x888888, 3)); // Reducida para que el sol DirectionalLight destaque
 
     // --- Controles 3D y animación ---
     add3DControls(); 
-    setupFollowButton(); // Configura el botón de seguimiento
     animate();
 }
 
-// --- Controles de mouse/arrastre ---
+// --- Controles de mouse/arrastre (Implementación necesaria para la rotación) ---
 function add3DControls() {
     let prevMouseX = 0, prevMouseY = 0;
 
-    threeContainer.addEventListener('mousedown', (e) => {
+    globe3D.addEventListener('mousedown', (e) => {
         isDragging = true;
         prevMouseX = e.clientX;
         prevMouseY = e.clientY;
-        isFollowingEarth = false; // Detener seguimiento al intentar arrastrar
-        const button = document.getElementById('followEarthButton');
-        if (button) button.textContent = 'Centrar en Tierra 🌍';
     });
 
-    threeContainer.addEventListener('mousemove', (e) => {
+    globe3D.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
 
+        // Calcular la diferencia de movimiento del mouse
         const deltaX = e.clientX - prevMouseX;
         const deltaY = e.clientY - prevMouseY;
 
+        // Establecer las velocidades de rotación (Y para arrastre horizontal, X para vertical)
         rotVelY = deltaX * rotationSpeedFactor; 
         rotVelX = deltaY * rotationSpeedFactor;
 
@@ -369,48 +366,13 @@ function add3DControls() {
         isDragging = false;
     });
 
+    // Manejar el redimensionamiento de la ventana
     window.addEventListener('resize', () => {
-        const w = threeContainer.clientWidth || 600;
-        const h = threeContainer.clientHeight || 400;
+        const w = globe3D.clientWidth || 600;
+        const h = globe3D.clientHeight || 400;
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
-    });
-}
-
-// --- Configuración del botón de seguimiento ---
-function setupFollowButton() {
-    const button = document.createElement('button');
-    button.textContent = 'Centrar en Tierra 🌍';
-    button.id = 'followEarthButton';
-    
-    // Estilo CSS básico para que no estorbe (Añadido al body)
-    button.style.position = 'absolute';
-    button.style.bottom = '10px';
-    button.style.left = '10px';
-    button.style.padding = '8px 15px';
-    button.style.zIndex = '1000';
-    button.style.backgroundColor = 'rgba(60, 179, 113, 0.8)';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
-
-    document.body.appendChild(button);
-
-    button.addEventListener('click', () => {
-        isFollowingEarth = !isFollowingEarth;
-        if (isFollowingEarth) {
-            button.textContent = 'Dejar de Seguir';
-            // Al iniciar el seguimiento, establecemos una posición de cámara inicial
-            camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
-            
-        } else {
-            button.textContent = 'Centrar en Tierra 🌍';
-            // Volvemos a la vista general
-            camera.position.set(0, 0, 15);
-            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
-        }
     });
 }
 
@@ -435,45 +397,29 @@ function animate() {
     
     // 🔄 LÓGICA DE ROTACIÓN MANUAL/AUTOMÁTICA DE LA TIERRA
     if (isDragging) {
+        // La rotación se aplica directamente mientras se arrastra
         earthGroup.rotation.x += rotVelX;
         earthGroup.rotation.y += rotVelY;
+        sunGroup.rotation.x += rotVelX;
+        sunGroup.rotation.y += rotVelY;
         
     } else {
+        // Aplicar rotación inercial
         earthGroup.rotation.x += rotVelX;
         earthGroup.rotation.y += rotVelY;
+        sunGroup.rotation.x += rotVelX;
+        sunGroup.rotation.y += rotVelY;
         
-        // Desaceleración
+        // Desaceleración (Damping)
         rotVelX *= rotationDamping; 
         rotVelY *= rotationDamping;
         
-        // Rotación automática 
+        // Rotación automática (solo si la rotación manual ha casi cesado)
         if (Math.abs(rotVelY) < 0.0001) {
-             earthGroup.rotation.y += 0.001; 
+             earthGroup.rotation.y += 0.001; // Velocidad de rotación automática
         }
     }
 
-    // 🚀 LÓGICA DE SEGUIMIENTO DE LA TIERRA
-    if (isFollowingEarth) {
-        // Obtenemos la posición global de la Tierra
-        const earthPosition = new THREE_NS.Vector3();
-        earthGroup.getWorldPosition(earthPosition);
-
-        // Definimos un punto de vista relativo a la Tierra (ej: 4 unidades detrás)
-        const relativeOffset = new THREE_NS.Vector3(0, 1, 4); 
-        
-        // Creamos una matriz de transformación a partir de la rotación del grupo Sol
-        const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
-
-        // Aplicamos la rotación orbital del sol (que contiene a la tierra) al offset
-        relativeOffset.applyMatrix4(matrix); 
-        
-        // Posicionamos la cámara: Posición de la Tierra + Offset rotado
-        camera.position.copy(earthPosition).add(relativeOffset);
-        
-        // Apuntamos la cámara a la Tierra
-        camera.lookAt(earthPosition);
-    }
-    
     // 🌌 Movimiento lento del fondo
     starSphere.rotation.y += 0.00005;
 
@@ -484,6 +430,7 @@ function animate() {
 
     renderer.render(scene, camera);
 }
+
 
 // Simulación Choque asteroide
 function latLonToVector3(lat, lon, radius = 1) {
