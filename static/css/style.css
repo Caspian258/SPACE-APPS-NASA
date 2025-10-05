@@ -52,6 +52,86 @@ input[type="number"] { width: 100%; padding: 8px; background: #0b1526; border: 1
 
 footer { padding: 10px 16px; border-top: 1px solid #25324a; background: #0f1a2b; color: #9fb0c7; }
 
+/* Footer icon button */
+footer { position: relative; }
+.footer-icon-button { position: absolute; right: 14px; bottom: 10px; background: transparent; border: none; padding: 0; cursor: pointer; }
+.footer-icon-button img { width: 28px; height: 28px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+
+/* ============================================= */
+/* == MODO AMIGABLE PARA DALTÓNICOS (ALTO CONTRASTE) == */
+/* ============================================= */
+
+body.colorblind-mode {
+	background: #1d2021;
+	color: #fbf1c7;
+}
+
+body.colorblind-mode header,
+body.colorblind-mode footer {
+	background: #282828;
+	border-color: #665c54;
+}
+
+body.colorblind-mode header p,
+body.colorblind-mode .value,
+body.colorblind-mode footer {
+	color: #d5c4a1;
+}
+
+body.colorblind-mode .panel.control,
+body.colorblind-mode .panel.results,
+body.colorblind-mode .viewer-left {
+	background: #282828;
+	border-color: #665c54;
+}
+
+body.colorblind-mode .panel.visualize,
+body.colorblind-mode .viewer-right {
+	background: #1d2021;
+	border-color: #665c54;
+}
+
+body.colorblind-mode input[type="number"],
+body.colorblind-mode .results-list li,
+body.colorblind-mode .neo-picker,
+body.colorblind-mode .legend-item {
+	background: #1d2021;
+	border-color: #665c54;
+	color: #fbf1c7;
+}
+
+body.colorblind-mode .simulate {
+	background: #fe8019;
+	color: #1d2021;
+}
+
+body.colorblind-mode .simulate:hover {
+	background: #d65d0e;
+}
+
+body.colorblind-mode .toggle-views button,
+body.colorblind-mode .neo-history button,
+body.colorblind-mode .toggle {
+	background: #458588;
+	color: #fbf1c7;
+	border-color: #83a598;
+}
+
+body.colorblind-mode .toggle-views button:hover,
+body.colorblind-mode .neo-history button:hover,
+body.colorblind-mode .toggle:hover {
+	background: #076678;
+}
+
+body.colorblind-mode .leaflet-container {
+	background: #1d2021;
+}
+
+body.colorblind-mode .tooltip .tooltiptext {
+	background-color: #32302f;
+	border-color: #665c54;
+}
+
 /* Leaflet dark tweaks */
 .leaflet-container { background: #0b1220; }
 

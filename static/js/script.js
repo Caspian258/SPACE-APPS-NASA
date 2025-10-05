@@ -18,7 +18,7 @@ let seismicLayer = null;
 let populationLayer = null;
 
 // UI
-const diameterInput = document.getElementById('diameter');
+const diameterInput = document.getElementById('diameter'); 
 const velocityInput = document.getElementById('velocity');
 const densityInput = document.getElementById('density');
 const mitigationInput = document.getElementById('mitigation');
@@ -151,8 +151,11 @@ function initThree() {
     globe3D.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
   }
-  const width = globe3D.clientWidth;
-  const height = globe3D.clientHeight;
+
+  // --- Configuración básica ---
+  const width = globe3D.clientWidth || 600;
+  const height = globe3D.clientHeight || 400;
+
   renderer = new THREE_NS.WebGLRenderer({ antialias: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -160,23 +163,69 @@ function initThree() {
   globe3D.appendChild(renderer.domElement);
 
   scene = new THREE_NS.Scene();
+
+  // Cámara
   camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 1000);
-  camera.position.set(0, 0, 4);
+  camera.position.set(0, 0, 3.5);
+  scene.add(camera);
 
-  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.8); scene.add(ambient);
-  const dir = new THREE_NS.DirectionalLight(0xffffff, 1.0); dir.position.set(5, 3, 5); scene.add(dir);
+  // Luces
+  const ambient = new THREE_NS.AmbientLight(0x888888);
+  scene.add(ambient);
 
+  const dirLight = new THREE_NS.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(5, 3, 5);
+  scene.add(dirLight);
+
+  // --- Geometría de la Tierra ---
   const geometry = new THREE_NS.SphereGeometry(1, 64, 64);
   const texLoader = new THREE_NS.TextureLoader();
-  texLoader.load('static/textures/earth_texture.jpg', (texture)=>{
-    earthMesh = new THREE_NS.Mesh(geometry, new THREE_NS.MeshPhongMaterial({ map: texture }));
-    scene.add(earthMesh);
-  }, undefined, ()=>{
-    earthMesh = new THREE_NS.Mesh(geometry, new THREE_NS.MeshPhongMaterial({ color: 0x1e90ff }));
-    scene.add(earthMesh);
+
+  // Textura principal
+  const earthTexture = texLoader.load('static/textures/earth_texture.jpg',
+    () => console.log('🌍 Textura cargada correctamente'),
+    undefined,
+    (err) => console.warn('⚠️ Error al cargar la textura:', err)
+  );
+
+  // Material base (si no carga, se ve azul)
+  const material = new THREE_NS.MeshPhongMaterial({
+    map: earthTexture,
+    color: earthTexture ? 0xffffff : 0x1e90ff,
+    shininess: 10,
   });
 
+  earthMesh = new THREE_NS.Mesh(geometry, material);
+  scene.add(earthMesh);
+
+  // --- Nubes opcionales ---
+  const cloudsTexture = texLoader.load('static/textures/fair_clouds_4k.png',
+    () => console.log('☁️ Nubes cargadas'),
+    undefined,
+    () => console.warn('⚠️ No se cargaron las nubes (no pasa nada)')
+  );
+
+  const cloudsMaterial = new THREE_NS.MeshLambertMaterial({
+    map: cloudsTexture,
+    transparent: true,
+    opacity: 0.4,
+  });
+
+  const cloudsMesh = new THREE_NS.Mesh(
+    new THREE_NS.SphereGeometry(1.01, 64, 64),
+    cloudsMaterial
+  );
+  earthMesh.add(cloudsMesh);
+
+  // --- Animación ---
+  function animate() {
+    requestAnimationFrame(animate);
+    if (earthMesh) earthMesh.rotation.y += 0.0008;
+    if (cloudsMesh) cloudsMesh.rotation.y += 0.001;
+    renderer.render(scene, camera);
+  }
   animate();
+
   add3DControls();
 }
 
@@ -608,3 +657,20 @@ simulateBtn.addEventListener('click', () => {
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
 });
+
+// Accesibilidad: botón de modo daltónico (toggle en <body>)
+(function(){
+  const colorToggleButton = document.getElementById('color-toggle-btn');
+  if (!colorToggleButton) return;
+  // Restaurar preferencia guardada (opcional)
+  try {
+    const saved = localStorage.getItem('colorblind-mode');
+    if (saved === '1') document.body.classList.add('colorblind-mode');
+  } catch (_) {}
+  colorToggleButton.addEventListener('click', () => {
+    document.body.classList.toggle('colorblind-mode');
+    try {
+      localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
+    } catch (_) {}
+  });
+})();
