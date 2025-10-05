@@ -24,6 +24,8 @@ let avDragging = false;
 let avPreviousMouseX = 0;
 let avPreviousMouseY = 0;
 let avRotSpeed = 0.01;
+let casualtyCircles = [];
+let currentVisualization = 'crater'; // Default view
 
 // UI
 const diameterInput = document.getElementById('diameter'); 
@@ -66,8 +68,7 @@ const translations = {
     'label.velocity': 'Velocidad del Asteroide (km/s)',
     'label.density': 'Densidad (kg/m³)',
     'label.selectImpact': 'Selecciona el punto de impacto',
-    'label.mitigation': 'Velocidad de Deflexión (km/s)',
-    'tooltip.mitigation': 'Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.',
+    'label.mitigation': 'Ángulo de impacto (°)',
     'button.simulate': '¡Simular Impacto!',
     'button.view3D': 'Ver Globo 3D',
     'button.view2D': 'Ver Mapa 2D',
@@ -158,8 +159,7 @@ const translations = {
     'label.velocity': 'Asteroid Velocity (km/s)',
     'label.density': 'Density (kg/m³)',
     'label.selectImpact': 'Select the impact point',
-    'label.mitigation': 'Deflection Velocity (km/s)',
-    'tooltip.mitigation': 'A kinetic impactor is a spacecraft that strikes the asteroid to slightly change its speed and trajectory.',
+    'label.mitigation': 'Impact angle (°)',
     'button.simulate': 'Run Impact Simulation',
     'button.view3D': 'Show 3D Globe',
     'button.view2D': 'Show 2D Map',
@@ -361,7 +361,7 @@ const asteroidCanvas = document.getElementById('asteroidCanvas');
 function updateSliderDisplays() {
   diameterValue.textContent = `${diameterInput.value} m`;
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
-  mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
+  mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(0)}°`;
 }
 [diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
@@ -392,24 +392,6 @@ selectionMap.on('click', (e) => {
 const map = L.map('map2D').setView([20, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(map);
 
-// Leyenda en el mapa
-const legend = L.control({ position: 'bottomright' });
-legend.onAdd = function() {
-  const div = L.DomUtil.create('div', 'leaflet-control legend');
-  div.style.background = '#0b1526';
-  div.style.border = '1px solid #22304a';
-  div.style.borderRadius = '6px';
-  div.style.padding = '8px';
-  div.style.color = '#e8eef5';
-  div.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:12px;height:12px;background:${zoneColors.crater};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Cráter</div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:12px;height:12px;background:${zoneColors.total};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Destrucción Total</div>
-    <div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:${zoneColors.severe};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Daños Severos</div>
-  `;
-  return div;
-};
-legend.addTo(map);
 // Second legend for fireball calculations
 const legend2 = L.control({ position: 'bottomright' });
 legend2.onAdd = function() {
@@ -444,18 +426,6 @@ legend2.onAdd = function() {
   return div;
 };
 legend2.addTo(map);
-
-// Capas de datos simuladas (carga desde /static/data si existen)
-fetch('static/data/seismic_zones.geojson').then(r=>r.json()).then(geo=>{
-  seismicLayer = L.geoJSON(geo, { style: { color: '#ff6b6b', weight: 1, opacity: 0.6, fillOpacity: 0.1 } }).addTo(map);
-}).catch(()=>{});
-fetch('static/data/population_density.json').then(r=>r.json()).then(pop=>{
-  populationLayer = L.layerGroup((pop.features||[]).map(f=>{
-    const { lat, lon, density } = f.properties;
-    const radius = Math.sqrt(density) * 1000;
-    return L.circle([lat, lon], { radius, color: '#6bc3ff', weight: 1, fillOpacity: 0.15 });
-  })).addTo(map);
-}).catch(()=>{});
 
 // Vistas 2D/3D
 show3D.addEventListener('click', () => { globe3D.classList.remove('hidden'); map2D.classList.add('hidden'); onResize(); });
@@ -2502,6 +2472,76 @@ simulateBtn.addEventListener('click', () => {
   legend2.addTo(map);
 });
 
+// Visualization toggle control
+const vizToggle = L.control({ position: 'topleft' });
+vizToggle.onAdd = function() {
+  const div = L.DomUtil.create('div', 'leaflet-control visualization-toggle');
+  div.style.background = '#0b1526';
+  div.style.border = '2px solid #22304a';
+  div.style.borderRadius = '8px';
+  div.style.padding = '12px';
+  div.style.color = '#e8eef5';
+  div.style.minWidth = '180px';
+  
+  div.innerHTML = `
+    <div style="font-weight:600;margin-bottom:10px;">Visualizaciones</div>
+    <button class="viz-btn" data-viz="crater" style="width:100%;margin-bottom:6px;padding:8px;background:#2a7de1;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      Cráter
+    </button>
+    <button class="viz-btn" data-viz="blast" style="width:100%;margin-bottom:6px;padding:8px;background:#1a2332;color:#e8eef5;border:1px solid #22304a;border-radius:6px;cursor:pointer;">
+      Anillos de Explosión
+    </button>
+    <button class="viz-btn" data-viz="casualties" style="width:100%;padding:8px;background:#1a2332;color:#e8eef5;border:1px solid #22304a;border-radius:6px;cursor:pointer;">
+      Víctimas
+    </button>
+  `;
+  
+  L.DomEvent.disableClickPropagation(div);
+  
+  div.querySelectorAll('.viz-btn').forEach(btn => {
+    btn.onclick = () => switchVisualization(btn.dataset.viz);
+  });
+  
+  return div;
+};
+
+function switchVisualization(type) {
+  currentVisualization = type;
+  
+  // Update buttons
+  document.querySelectorAll('.viz-btn').forEach(btn => {
+    if (btn.dataset.viz === type) {
+      btn.style.background = '#2a7de1';
+      btn.style.border = 'none';
+    } else {
+      btn.style.background = '#1a2332';
+      btn.style.border = '1px solid #22304a';
+    }
+  });
+  
+  // Toggle layers
+  if (craterCircle) {
+    craterCircle.setStyle({ 
+      opacity: type === 'crater' ? 0.8 : 0, 
+      fillOpacity: type === 'crater' ? 0.5 : 0 
+    });
+  }
+  
+  blastCircles.forEach(c => {
+    c.setStyle({ 
+      opacity: type === 'blast' ? 2 : 0, 
+      fillOpacity: type === 'blast' ? (c.options.originalFillOpacity || 0.2) : 0 
+    });
+  });
+  
+  casualtyCircles.forEach(c => {
+    c.setStyle({ 
+      opacity: type === 'casualties' ? 2 : 0, 
+      fillOpacity: type === 'casualties' ? (c.options.originalFillOpacity || 0.2) : 0 
+    });
+  });
+}
+
 const accessibilityMenuButton = document.getElementById('accessibilityMenuButton');
 const accessibilityMenu = document.getElementById('accessibilityMenu');
 const faqModal = document.getElementById('faqModal');
@@ -2680,8 +2720,7 @@ function updateCraterDisplay() {
     // Get density from the input field
     const phi_i = parseFloat(document.getElementById('density').value);
     const phi_t = 2000;
-    const theta_deg = document.getElementById('theta') ? 
-                      parseFloat(document.getElementById('theta').value) : 45;
+    const theta_deg = parseFloat(document.getElementById('mitigation').value);
     
     console.log('Using density from input:', phi_i);
     
@@ -2716,44 +2755,26 @@ function updateCraterDisplay() {
 }
 
 function updateMapCrater(craterRadius) {
-    console.log('=== updateMapCrater START ===');
-    console.log('Crater radius received:', craterRadius);
-    console.log('impactMarker:', impactMarker);
-    console.log('map object:', map);
-    
-    if (!impactMarker) {
-        console.error('No impact marker!');
-        return;
-    }
-    
-    // Remove old crater circle
     if (craterCircle) {
-        console.log('Removing old crater circle');
         map.removeLayer(craterCircle);
     }
     
-    const impactCoords = impactMarker.getLatLng();
-    console.log('Impact coordinates:', impactCoords);
+    if (!impactMarker) return;
     
-    // Create crater circle
-    console.log('Creating circle with radius:', craterRadius);
+    const impactCoords = impactMarker.getLatLng();
+    
     craterCircle = L.circle(impactCoords, {
         radius: craterRadius,
         color: '#8B0000',
         fillColor: '#8B0000',
-        fillOpacity: 0.5,
+        fillOpacity: currentVisualization === 'crater' ? 0.5 : 0,
+        opacity: currentVisualization === 'crater' ? 0.8 : 0,
         weight: 2
-    });
+    }).addTo(map);
     
-    console.log('Adding circle to map');
-    craterCircle.addTo(map);
-    
-    console.log('Circle added, bounds:', craterCircle.getBounds());
-    
-    // Zoom to crater
-    map.fitBounds(craterCircle.getBounds(), { padding: [50, 50] });
-    
-    console.log('=== updateMapCrater END ===');
+    if (currentVisualization === 'crater') {
+        map.fitBounds(craterCircle.getBounds(), { padding: [50, 50] });
+    }
 }
 
 function updateLegend(craterRadius) {
@@ -2852,4 +2873,229 @@ function calculateCraterImpact(phi_i, phi_t, L, v_i, theta_deg) {
         d_fr,
         h_fr
     };
+}
+
+// === Blast Rings (Table 4 scaled) ===
+const table1kt = [
+  {d1_m: 126,  p_pa: 426000, desc: "Vehículos destruidos y desplazados"},
+  {d1_m: 133,  p_pa: 379000, desc: "Puentes colapsarán"},
+  {d1_m: 149,  p_pa: 297000, desc: "Vehículos volcados; reparaciones mayores"},
+  {d1_m: 155,  p_pa: 273000, desc: "Edificios de acero: distorsión extrema"},
+  {d1_m: 229,  p_pa: 121000, desc: "Puentes de armadura colapsarán"},
+  {d1_m: 251,  p_pa: 100000, desc: "Puentes: distorsión sustancial"},
+  {d1_m: 389,  p_pa: 42600,  desc: "Edificios de varios pisos colapsarán"},
+  {d1_m: 411,  p_pa: 38500,  desc: "Edificios: grietas severas"},
+  {d1_m: 502,  p_pa: 26800,  desc: "Edificios de madera casi colapso total"},
+  {d1_m: 549,  p_pa: 22900,  desc: "Techos severamente dañados"},
+  {d1_m: 1160, p_pa: 6900,   desc: "Ventanas rotas"}
+];
+
+// Casualty probability functions
+function fatalityProb(r) {
+  const A = 1.7809, k = 0.6533;
+  return Math.min(1, A * Math.exp(-k * r));
+}
+
+function injuryProb(r) {
+  const C = 0.4979, mu = 3.8978, sigma = 1.7290;
+  return C * Math.exp(-Math.pow(r - mu, 2) / (2 * Math.pow(sigma, 2)));
+}
+
+// Query population from Overpass API
+async function getPopulation(lat, lon) {
+  const url = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:5000,${lat},${lon})[place~"city|town|village"][population];out 1;`;
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.elements && data.elements.length > 0) {
+      const popStr = data.elements[0].tags.population;
+      const pop = parseInt(popStr);
+      if (!isNaN(pop)) return pop;
+    }
+  } catch (err) {
+    console.error("Population fetch failed", err);
+  }
+  return 50000; // fallback
+}
+
+// Storage for blast circles
+let blastCircles = [];
+
+// Draw blast damage rings
+function drawBlastRings(latlng, energyMegatons) {
+  blastCircles.forEach(c => map.removeLayer(c));
+  blastCircles = [];
+  
+  const energyKt = energyMegatons * 1000;
+  const scale = Math.cbrt(energyKt);
+  
+  const scaled = table1kt.map((row) => ({
+    d_m: row.d1_m * scale,
+    p_pa: row.p_pa,
+    desc: row.desc
+  }));
+  
+  const colors = ['#8B0000', '#FF4500', '#FF8C00', '#FFD700', '#90EE90', '#4169E1'];
+  
+  for (let i = scaled.length - 1; i >= 0; i--) {
+    const entry = scaled[i];
+    const colorIdx = Math.floor((i / scaled.length) * colors.length);
+    const baseOpacity = 0.1 + (0.05 * (scaled.length - i));
+    
+    const circle = L.circle(latlng, {
+      radius: entry.d_m,
+      color: colors[colorIdx],
+      weight: 2,
+      fillColor: colors[colorIdx],
+      fillOpacity: currentVisualization === 'blast' ? baseOpacity : 0,
+      opacity: currentVisualization === 'blast' ? 2 : 0,
+      originalFillOpacity: baseOpacity // Store for later
+    }).addTo(map);
+    
+    circle.bindPopup(`
+      <b>Zona ${i + 1}</b><br/>
+      ${entry.desc}<br/>
+      <b>Distancia:</b> ${(entry.d_m / 1000).toFixed(2)} km<br/>
+      <b>Presión:</b> ${(entry.p_pa / 1000).toFixed(0)} kPa
+    `);
+    
+    blastCircles.push(circle);
+  }
+  
+  if (currentVisualization === 'blast' && blastCircles.length > 0) {
+    map.fitBounds(blastCircles[0].getBounds(), { padding: [50, 50] });
+  }
+}
+
+// Calculate casualties
+async function calculateCasualties(latlng, radiusMiles) {
+  const pop = await getPopulation(latlng.lat, latlng.lng);
+  const cityRadius = 5; // km
+  const density = pop / (Math.PI * cityRadius ** 2);
+  
+  let totalFatal = 0, totalInj = 0;
+  const step = 0.5;
+  
+  for (let r = 0; r < radiusMiles; r += step) {
+    const ringArea = Math.PI * ((r + step) ** 2 - r ** 2);
+    const ringPop = density * ringArea;
+    totalFatal += ringPop * fatalityProb(r + step / 2);
+    totalInj += ringPop * injuryProb(r + step / 2);
+  }
+  
+  return { pop, totalFatal, totalInj };
+}
+
+function drawCasualtyRings(latlng, radiusMiles, casualties) {
+  casualtyCircles.forEach(c => map.removeLayer(c));
+  casualtyCircles = [];
+  
+  const radiusMeters = radiusMiles * 1609.34;
+  const zones = [
+    { r: 0.25, color: '#8B0000', label: 'Zona de Muerte Inmediata' },
+    { r: 0.5, color: '#FF4500', label: 'Zona de Mortalidad Alta' },
+    { r: 1, color: '#FF8C00', label: 'Zona de Lesiones Graves' },
+    { r: 2, color: '#FFD700', label: 'Zona de Lesiones Moderadas' },
+    { r: 3, color: '#90EE90', label: 'Zona de Lesiones Leves' }
+  ];
+  
+  for (let i = zones.length - 1; i >= 0; i--) {
+    const zone = zones[i];
+    const baseOpacity = 0.15 + (0.1 * (zones.length - i));
+    
+    const circle = L.circle(latlng, {
+      radius: radiusMeters * zone.r,
+      color: zone.color,
+      weight: 2,
+      fillColor: zone.color,
+      fillOpacity: currentVisualization === 'casualties' ? baseOpacity : 0,
+      opacity: currentVisualization === 'casualties' ? 2 : 0,
+      originalFillOpacity: baseOpacity
+    }).addTo(map);
+    
+    const zoneFatal = Math.round(casualties.totalFatal * fatalityProb(zone.r));
+    const zoneInj = Math.round(casualties.totalInj * injuryProb(zone.r));
+    
+    circle.bindPopup(`
+      <b>${zone.label}</b><br/>
+      <b>Radio:</b> ${(radiusMeters * zone.r / 1000).toFixed(2)} km<br/>
+      <b>Muertes estimadas:</b> ${zoneFatal.toLocaleString()}<br/>
+      <b>Heridos estimados:</b> ${zoneInj.toLocaleString()}
+    `);
+    
+    casualtyCircles.push(circle);
+  }
+  
+  if (currentVisualization === 'casualties' && casualtyCircles.length > 0) {
+    map.fitBounds(casualtyCircles[0].getBounds(), { padding: [50, 50] });
+  }
+}
+
+// Update your updateCraterDisplay function to include blast effects
+async function updateCraterDisplay() {
+  console.log('=== updateCraterDisplay START ===');
+  
+  document.getElementById('globe3D').classList.add('hidden');
+  document.getElementById('map2D').classList.remove('hidden');
+  
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
+  
+  if (!impactMarker) {
+    alert('Por favor, haz clic en el mapa para seleccionar un punto de impacto');
+    return;
+  }
+  
+  const L_input = parseFloat(diameterInput.value);
+  const v_i = parseFloat(velocityInput.value) * 1000;
+  const phi_i = parseFloat(document.getElementById('density').value);
+  const phi_t = 2000;
+  const theta_deg = 120 - parseFloat(document.getElementById('mitigation').value);
+  
+  // Calculate crater
+  const craterData = calculateCraterImpact(phi_i, phi_t, L_input, v_i, theta_deg);
+  
+  // Update results panel
+  document.getElementById('craterType').textContent = craterData.craterType;
+  document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
+  document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
+  document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);
+  document.getElementById('h_fr').textContent = craterData.h_fr > 0 ? craterData.h_fr.toFixed(2) : 'N/A';
+  
+  // Calculate energy
+  const mass = (4 / 3) * Math.PI * Math.pow(L_input / 2, 3) * phi_i;
+  const energy_joules = 0.5 * mass * Math.pow(v_i, 2);
+  const energy_megatons = energy_joules / (4.184e15);
+  document.getElementById('energy').textContent = energy_megatons.toFixed(2);
+  
+  // Draw crater
+  const craterRadius = craterData.D_fr / 2;
+  updateMapCrater(craterRadius);
+  
+  // Draw blast damage rings
+  const impactCoords = impactMarker.getLatLng();
+  drawBlastRings(impactCoords, energy_megatons);
+  
+  // Calculate casualties (convert crater radius to miles for casualty model)
+  const radiusMiles = (craterData.D_fr / 2) / 1609.34;
+  const casualties = await calculateCasualties(impactCoords, radiusMiles * 3);
+  
+  drawCasualtyRings(impactCoords, radiusMiles, casualties);
+  
+  // Add toggle if not exists
+  if (!map._controlCorners.topleft.querySelector('.visualization-toggle')) {
+    vizToggle.addTo(map);
+  }
+  
+  // Show current visualization
+  switchVisualization(currentVisualization);
+
+  // Add casualties to results
+  const magnitudeEl = document.getElementById('magnitude');
+  if (magnitudeEl) {
+    magnitudeEl.textContent = `Población estimada: ${casualties.pop.toLocaleString()}, Muertes: ${Math.round(casualties.totalFatal).toLocaleString()}, Heridos: ${Math.round(casualties.totalInj).toLocaleString()}`;
+  }
+  
+  console.log('=== updateCraterDisplay END ===');
 }

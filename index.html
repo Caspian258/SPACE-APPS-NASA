@@ -39,18 +39,16 @@
       </div>
 
       <div class="control-group">
-        <label><span data-i18n="label.selectImpact">Selecciona el punto de impacto</span></label>
-        <div id="selectMap" class="map-select"></div>
-        <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
+        <label for="mitigation">
+          <span data-i18n="label.mitigation">Ángulo de impacto (°)</span>
+        <input type="range" id="mitigation" min="30" max="90" step="1" value="30" />
+        <div class="value" id="mitigationValue">0°</div>
       </div>
 
       <div class="control-group">
-        <label for="mitigation" class="tooltip">
-          <span data-i18n="label.mitigation">Velocidad de Deflexión (km/s)</span>
-          <span class="tooltiptext" data-i18n="tooltip.mitigation">Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.</span>
-        </label>
-        <input type="range" id="mitigation" min="0" max="0.1" step="0.001" value="0" />
-        <div class="value" id="mitigationValue">0.000 km/s</div>
+        <label><span data-i18n="label.selectImpact">Selecciona el punto de impacto</span></label>
+        <div id="selectMap" class="map-select"></div>
+        <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
       </div>
 
   <button id="simulateBtn" class="simulate" data-i18n="button.simulate">¡Simular Impacto!</button>
