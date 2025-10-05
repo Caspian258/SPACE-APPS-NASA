@@ -179,8 +179,7 @@ const threeContainer = document.getElementById('globe3D') || {
     innerHTML: '', 
     appendChild: () => {} 
 };
-
-// --- Función genérica para crear planetas ---
+// --- Función genérica para crear planetas -__
 function createPlanet({
     name,
     texturePath,
