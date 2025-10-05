@@ -57,6 +57,268 @@ const neoMinVel = document.getElementById('neoMinVel');
 const neoMaxVel = document.getElementById('neoMaxVel');
 const neoSearch = document.getElementById('neoSearch');
 
+const translations = {
+  es: {
+    title: 'Asteroid Impact Simulator',
+    subtitle: 'Explora el impacto de asteroides y estrategias de mitigación.',
+    controlPanelHeading: 'Panel de Control',
+    'label.diameter': 'Diámetro del Asteroide (m)',
+    'label.velocity': 'Velocidad del Asteroide (km/s)',
+    'label.density': 'Densidad (kg/m³)',
+    'label.selectImpact': 'Selecciona el punto de impacto',
+    'label.mitigation': 'Velocidad de Deflexión (km/s)',
+    'tooltip.mitigation': 'Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.',
+    'button.simulate': '¡Simular Impacto!',
+    'button.view3D': 'Ver Globo 3D',
+    'button.view2D': 'Ver Mapa 2D',
+    'label.catalogHeading': 'Catálogo de objetos',
+    'radio.asteroids': 'Asteroides',
+    'radio.comets': 'Cometas',
+    'label.selectObject': 'Seleccionar objeto',
+    'label.filterName': 'Buscar por nombre',
+    'placeholder.filterName': 'Ej: Apophis',
+    'label.filterMinDiameter': 'Diámetro mínimo (km)',
+    'label.filterMinVelocity': 'Velocidad mínima (km/s)',
+    'placeholder.numeric': '0.0',
+    'label.discoveryRange': 'Rango de fechas de descubrimiento',
+    'button.calculateProbability': 'Calcular Probabilidad de Impacto',
+  'option.loadingCatalog': 'Cargando catálogo...',
+  'option.emptyCatalog': 'Sin datos disponibles',
+  'message.noDataAvailable': 'No hay datos disponibles',
+  'message.selectFromCatalog': 'Selecciona un objeto del catálogo',
+  'summary.type.asteroid': 'Asteroide',
+  'summary.type.comet': 'Cometa',
+  'summary.diameter': 'Diámetro',
+  'summary.semiMajor': 'a',
+  'summary.eccentricity': 'e',
+  'details.name': 'Nombre',
+  'details.type': 'Tipo',
+  'details.type.asteroid': 'Asteroide',
+  'details.type.comet': 'Cometa',
+  'details.estimatedDiameter': 'Diámetro estimado',
+  'details.modelDensity': 'Densidad modelo',
+  'details.rotationPeriod': 'Periodo de rotación aprox.',
+  'details.velocity': 'Velocidad estimada',
+  'details.semiMajor': 'Semieje mayor (a)',
+  'details.eccentricity': 'Excentricidad (e)',
+  'details.inclination': 'Inclinación (i)',
+  'details.ascendingNode': 'Nodo ascendente (Ω)',
+  'details.argPeriapsis': 'Arg. del perihelio (ω)',
+  'details.orbitalPeriod': 'Período orbital',
+  'details.discovery': 'Descubierto',
+  'details.rotationHours': 'h',
+  'units.years': 'años',
+    resultsHeading: 'Resultados',
+    'results.energy': 'Energía de Impacto:',
+    'results.craterType': 'Tipo de cráter:',
+    'results.initialDiameter': 'Diámetro inicial:',
+    'results.finalDiameter': 'Diámetro final:',
+    'results.finalDepth': 'Profundidad final:',
+    'results.rimHeight': 'Altura de cresta:',
+    'results.probability': 'Probabilidad de Impacto por Órbita (debug):',
+    'units.megatons': 'Megatones',
+    'units.meters': 'm',
+    'neo.heading': 'Selecciona un NEO',
+    'neo.source': 'Fuente: NASA NeoWs (demo)',
+    'button.apply': 'Aplicar',
+    'button.close': 'Cerrar',
+    'viewer.heading': 'Visor de Asteroides',
+    'viewer.modeLabel': 'Modo',
+    'viewer.modeManual': 'Modo Manual',
+  'viewer.modeApi': 'Modo API',
+    'viewer.modeHint': 'Pulsa para alternar entre Manual y API',
+    'viewer.manual.diameter': 'Diámetro (km)',
+    'viewer.manual.speed': 'Velocidad (unid.)',
+    'viewer.manual.density': 'Densidad (kg/m³)',
+    'viewer.manual.rotation': 'Rotación (°/s)',
+    'viewer.api.sourceLabel': 'Fuente de datos',
+    'viewer.api.listLabel': 'Lista de asteroides (catálogo)',
+    'viewer.api.detailsLabel': 'Detalles',
+    'footer.disclaimer': 'Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)',
+    'menu.accessibility': 'Accesibilidad y ayuda',
+    'menu.colorToggle': 'Modo daltónico',
+    'menu.faq': 'Preguntas frecuentes',
+    'menu.languageLabel': 'Idioma',
+    'menu.lang.es': 'Español',
+    'menu.lang.en': 'English',
+    'faq.title': 'Preguntas frecuentes',
+    'faq.q1': '¿Cómo selecciono un punto de impacto?',
+    'faq.a1': 'Usa el mapa de selección en el panel izquierdo y haz clic en la ubicación deseada. El marcador mostrará las coordenadas exactas.',
+    'faq.q2': '¿Qué significa el modo daltónico?',
+    'faq.a2': 'Activa una paleta de alto contraste pensada para usuarios con daltonismo y condiciones de baja visibilidad.',
+    'faq.q3': '¿Cómo cambio entre asteroides y cometas?',
+    'faq.a3': 'Utiliza los botones de radio en el catálogo o en el visor 3D para alternar entre los conjuntos de datos disponibles.',
+    'faq.closeAria': 'Cerrar'
+  },
+  en: {
+    title: 'Asteroid Impact Simulator',
+    subtitle: 'Explore asteroid impacts and mitigation strategies.',
+    controlPanelHeading: 'Control Panel',
+    'label.diameter': 'Asteroid Diameter (m)',
+    'label.velocity': 'Asteroid Velocity (km/s)',
+    'label.density': 'Density (kg/m³)',
+    'label.selectImpact': 'Select the impact point',
+    'label.mitigation': 'Deflection Velocity (km/s)',
+    'tooltip.mitigation': 'A kinetic impactor is a spacecraft that strikes the asteroid to slightly change its speed and trajectory.',
+    'button.simulate': 'Run Impact Simulation',
+    'button.view3D': 'Show 3D Globe',
+    'button.view2D': 'Show 2D Map',
+    'label.catalogHeading': 'Object Catalog',
+    'radio.asteroids': 'Asteroids',
+    'radio.comets': 'Comets',
+    'label.selectObject': 'Select object',
+    'label.filterName': 'Search by name',
+    'placeholder.filterName': 'e.g., Apophis',
+    'label.filterMinDiameter': 'Minimum diameter (km)',
+    'label.filterMinVelocity': 'Minimum velocity (km/s)',
+    'placeholder.numeric': '0.0',
+    'label.discoveryRange': 'Discovery date range',
+    'button.calculateProbability': 'Compute Impact Probability',
+  'option.loadingCatalog': 'Loading catalog...',
+  'option.emptyCatalog': 'No data available',
+  'message.noDataAvailable': 'No data available',
+  'message.selectFromCatalog': 'Pick an object from the catalog',
+  'summary.type.asteroid': 'Asteroid',
+  'summary.type.comet': 'Comet',
+  'summary.diameter': 'Diameter',
+  'summary.semiMajor': 'a',
+  'summary.eccentricity': 'e',
+  'details.name': 'Name',
+  'details.type': 'Type',
+  'details.type.asteroid': 'Asteroid',
+  'details.type.comet': 'Comet',
+  'details.estimatedDiameter': 'Estimated diameter',
+  'details.modelDensity': 'Model density',
+  'details.rotationPeriod': 'Approx. rotation period',
+  'details.velocity': 'Estimated velocity',
+  'details.semiMajor': 'Semi-major axis (a)',
+  'details.eccentricity': 'Eccentricity (e)',
+  'details.inclination': 'Inclination (i)',
+  'details.ascendingNode': 'Ascending node (Ω)',
+  'details.argPeriapsis': 'Argument of perihelion (ω)',
+  'details.orbitalPeriod': 'Orbital period',
+  'details.discovery': 'Discovered',
+  'details.rotationHours': 'h',
+  'units.years': 'years',
+    resultsHeading: 'Results',
+    'results.energy': 'Impact Energy:',
+    'results.craterType': 'Crater type:',
+    'results.initialDiameter': 'Initial diameter:',
+    'results.finalDiameter': 'Final diameter:',
+    'results.finalDepth': 'Final depth:',
+    'results.rimHeight': 'Rim height:',
+    'results.probability': 'Orbit Impact Probability (debug):',
+    'units.megatons': 'Megatons',
+    'units.meters': 'm',
+    'neo.heading': 'Choose a NEO',
+    'neo.source': 'Source: NASA NeoWs (demo)',
+    'button.apply': 'Apply',
+    'button.close': 'Close',
+    'viewer.heading': 'Asteroid Viewer',
+    'viewer.modeLabel': 'Mode',
+    'viewer.modeManual': 'Manual Mode',
+  'viewer.modeApi': 'API Mode',
+    'viewer.modeHint': 'Tap to switch between Manual and API',
+    'viewer.manual.diameter': 'Diameter (km)',
+    'viewer.manual.speed': 'Speed (units)',
+    'viewer.manual.density': 'Density (kg/m³)',
+    'viewer.manual.rotation': 'Rotation (°/s)',
+    'viewer.api.sourceLabel': 'Data source',
+    'viewer.api.listLabel': 'Catalog list',
+    'viewer.api.detailsLabel': 'Details',
+    'footer.disclaimer': 'Data: NASA APIs and USGS (simulated). This simulator is educational and simplified. (Standalone front-end)',
+    'menu.accessibility': 'Accessibility & help',
+    'menu.colorToggle': 'Colorblind mode',
+    'menu.faq': 'Frequently Asked Questions',
+    'menu.languageLabel': 'Language',
+    'menu.lang.es': 'Spanish',
+    'menu.lang.en': 'English',
+    'faq.title': 'Frequently Asked Questions',
+    'faq.q1': 'How do I choose an impact point?',
+    'faq.a1': 'Use the selection map in the left panel and click the desired location. The marker shows the exact coordinates.',
+    'faq.q2': 'What does colorblind mode do?',
+    'faq.a2': 'Enables a high-contrast palette designed for users with color vision deficiency and low-visibility conditions.',
+    'faq.q3': 'How do I switch between asteroids and comets?',
+    'faq.a3': 'Use the radio buttons in the catalog or in the 3D viewer to swap between the available datasets.',
+    'faq.closeAria': 'Close'
+  }
+};
+
+const LANGUAGE_STORAGE_KEY = 'simulator-language';
+let currentLanguage = 'es';
+
+function applyTextTranslation(elements, dict, attribute, callback) {
+  elements.forEach((el) => {
+    const key = el.getAttribute(attribute);
+    if (!key) return;
+    const value = dict[key];
+    if (typeof value === 'undefined') return;
+    callback(el, value);
+  });
+}
+
+function translate(key) {
+  if (!key) return '';
+  const dict = translations[currentLanguage] || translations.es;
+  if (Object.prototype.hasOwnProperty.call(dict, key)) return dict[key];
+  const fallback = translations.es;
+  if (fallback && Object.prototype.hasOwnProperty.call(fallback, key)) return fallback[key];
+  return '';
+}
+
+function setLanguage(lang) {
+  if (!translations[lang]) {
+    lang = 'es';
+  }
+  currentLanguage = lang;
+  const dict = translations[lang];
+  document.documentElement.setAttribute('lang', lang);
+  try {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  } catch (_) {}
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n]'), dict, 'data-i18n', (el, value) => {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.value = value;
+    } else {
+      el.textContent = value;
+    }
+  });
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n-placeholder]'), dict, 'data-i18n-placeholder', (el, value) => {
+    el.setAttribute('placeholder', value);
+  });
+
+  applyTextTranslation(document.querySelectorAll('[data-i18n-aria-label]'), dict, 'data-i18n-aria-label', (el, value) => {
+    el.setAttribute('aria-label', value);
+  });
+
+  const menuButton = document.getElementById('accessibilityMenuButton');
+  if (menuButton) {
+    const label = dict['menu.accessibility'];
+    if (label) {
+      menuButton.title = label;
+      const icon = menuButton.querySelector('img');
+      if (icon) icon.alt = label;
+    }
+  }
+
+  document.querySelectorAll('.lang-option').forEach((btn) => {
+    const option = btn.getAttribute('data-lang-option');
+    btn.classList.toggle('active', option === lang);
+  });
+
+  if (modeToggle) {
+    const modeKey = viewerMode === 'manual' ? 'viewer.modeManual' : 'viewer.modeApi';
+    const label = dict[modeKey];
+    if (label) modeToggle.textContent = label;
+  }
+
+  updateSliderDisplays();
+  updateManualDisplay();
+  updateObjectSummary(getCurrentSelectedItem());
+  updateApiDetails();
+}
 
 // Vistas
 const show3D = document.getElementById('show3D');
@@ -1081,12 +1343,15 @@ function normalizeCometRecord(record, index = 0) {
   };
 }
 
-function setSelectLoading(selectEl, message) {
+function setSelectLoading(selectEl, messageKey) {
   if (!selectEl) return;
   selectEl.innerHTML = '';
   const option = document.createElement('option');
   option.value = '';
-  option.textContent = message;
+  if (messageKey) {
+    option.setAttribute('data-i18n', messageKey);
+    option.textContent = translate(messageKey) || messageKey;
+  }
   selectEl.appendChild(option);
   selectEl.disabled = true;
 }
@@ -1106,11 +1371,15 @@ function updateObjectSummary(objectData) {
     objectSummary.textContent = '--';
     return;
   }
-  const typeLabel = objectData.type === 'comet' ? 'Cometa' : 'Asteroide';
+  const typeKey = objectData.type === 'comet' ? 'summary.type.comet' : 'summary.type.asteroid';
+  const typeLabel = translate(typeKey) || (objectData.type === 'comet' ? 'Cometa' : 'Asteroide');
   const diameter = Number.isFinite(objectData.diameterKm) ? `${objectData.diameterKm.toFixed(1)} km` : 'N/D';
   const eccentricity = Number.isFinite(objectData.e) ? objectData.e.toFixed(3) : 'N/D';
   const semiMajor = Number.isFinite(objectData.a) ? `${objectData.a.toFixed(3)} UA` : 'N/D';
-  objectSummary.textContent = `${typeLabel} • Diámetro: ${diameter} • a: ${semiMajor} • e: ${eccentricity}`;
+  const diameterLabel = translate('summary.diameter') || 'Diámetro';
+  const semiMajorLabel = translate('summary.semiMajor') || 'a';
+  const eccentricityLabel = translate('summary.eccentricity') || 'e';
+  objectSummary.textContent = `${typeLabel} • ${diameterLabel}: ${diameter} • ${semiMajorLabel}: ${semiMajor} • ${eccentricityLabel}: ${eccentricity}`;
 }
 
 function populateObjectSelect() {
@@ -1118,7 +1387,7 @@ function populateObjectSelect() {
   suppressDatasetEvents = true;
   objectSelect.innerHTML = '';
   if (!filteredCatalog.length) {
-    setSelectLoading(objectSelect, 'Sin datos disponibles');
+    setSelectLoading(objectSelect, 'option.emptyCatalog');
     suppressDatasetEvents = false;
     return;
   }
@@ -1135,21 +1404,23 @@ function populateObjectSelect() {
 function formatObjectDetails(objectData) {
   if (!objectData) return '';
   const lines = [];
-  lines.push(`Nombre: ${objectData.name}`);
-  lines.push(`Tipo: ${objectData.type === 'comet' ? 'Cometa' : 'Asteroide'}`);
-  if (Number.isFinite(objectData.diameterKm)) lines.push(`Diámetro estimado: ${objectData.diameterKm.toFixed(2)} km`);
-  if (Number.isFinite(objectData.density)) lines.push(`Densidad modelo: ${Math.round(objectData.density)} kg/m³`);
-  if (Number.isFinite(objectData.rotation_period)) lines.push(`Periodo de rotación aprox.: ${objectData.rotation_period.toFixed(1)} h`);
-  if (Number.isFinite(objectData.velocity)) lines.push(`Velocidad estimada: ${objectData.velocity.toFixed(1)} km/s`);
-  if (Number.isFinite(objectData.a)) lines.push(`Semieje mayor (a): ${objectData.a.toFixed(3)} UA`);
-  if (Number.isFinite(objectData.e)) lines.push(`Excentricidad (e): ${objectData.e.toFixed(3)}`);
-  if (Number.isFinite(objectData.i)) lines.push(`Inclinación (i): ${objectData.i.toFixed(2)}°`);
-  if (Number.isFinite(objectData.omega)) lines.push(`Nodo ascendente (Ω): ${objectData.omega.toFixed(2)}°`);
-  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`Arg. del perihelio (ω): ${objectData.argPeriapsis.toFixed(2)}°`);
+  lines.push(`${translate('details.name') || 'Nombre'}: ${objectData.name}`);
+  const typeKeyDetails = objectData.type === 'comet' ? 'details.type.comet' : 'details.type.asteroid';
+  const typeValue = translate(typeKeyDetails) || (objectData.type === 'comet' ? 'Cometa' : 'Asteroide');
+  lines.push(`${translate('details.type') || 'Tipo'}: ${typeValue}`);
+  if (Number.isFinite(objectData.diameterKm)) lines.push(`${translate('details.estimatedDiameter') || 'Diámetro estimado'}: ${objectData.diameterKm.toFixed(2)} km`);
+  if (Number.isFinite(objectData.density)) lines.push(`${translate('details.modelDensity') || 'Densidad modelo'}: ${Math.round(objectData.density)} kg/m³`);
+  if (Number.isFinite(objectData.rotation_period)) lines.push(`${translate('details.rotationPeriod') || 'Periodo de rotación aprox.'}: ${objectData.rotation_period.toFixed(1)} ${translate('details.rotationHours') || 'h'}`);
+  if (Number.isFinite(objectData.velocity)) lines.push(`${translate('details.velocity') || 'Velocidad estimada'}: ${objectData.velocity.toFixed(1)} km/s`);
+  if (Number.isFinite(objectData.a)) lines.push(`${translate('details.semiMajor') || 'Semieje mayor (a)'}: ${objectData.a.toFixed(3)} UA`);
+  if (Number.isFinite(objectData.e)) lines.push(`${translate('details.eccentricity') || 'Excentricidad (e)'}: ${objectData.e.toFixed(3)}`);
+  if (Number.isFinite(objectData.i)) lines.push(`${translate('details.inclination') || 'Inclinación (i)'}: ${objectData.i.toFixed(2)}°`);
+  if (Number.isFinite(objectData.omega)) lines.push(`${translate('details.ascendingNode') || 'Nodo ascendente (Ω)'}: ${objectData.omega.toFixed(2)}°`);
+  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`${translate('details.argPeriapsis') || 'Arg. del perihelio (ω)'}: ${objectData.argPeriapsis.toFixed(2)}°`);
   const period = toNumber(objectData.raw?.p_yr);
-  if (Number.isFinite(period)) lines.push(`Período orbital: ${period.toFixed(2)} años`);
+  if (Number.isFinite(period)) lines.push(`${translate('details.orbitalPeriod') || 'Período orbital'}: ${period.toFixed(2)} ${translate('units.years') || 'años'}`);
   const discoveryRaw = objectData.discoveryDate || objectData.raw?.discovery_date || objectData.raw?.disc_date || objectData.raw?.discoveryDate;
-  if (discoveryRaw) lines.push(`Descubierto: ${discoveryRaw}`);
+  if (discoveryRaw) lines.push(`${translate('details.discovery') || 'Descubierto'}: ${discoveryRaw}`);
   return lines.join('\n');
 }
 
@@ -1272,7 +1543,7 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectIndex = null;
     currentObjectId = null;
     updateObjectSummary(null);
-    if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    if (apiAsteroidDetails) apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
     updateImpactProbabilityForItem(null, { source: 'filters' });
     return;
   }
@@ -1320,8 +1591,8 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   currentDatasetKey = key;
   isCatalogLoading = true;
   updateDatasetRadios(key);
-  setSelectLoading(objectSelect, 'Cargando catálogo...');
-  setSelectLoading(apiAsteroidSelect, 'Cargando catálogo...');
+  setSelectLoading(objectSelect, 'option.loadingCatalog');
+  setSelectLoading(apiAsteroidSelect, 'option.loadingCatalog');
   if (apiAsteroidDetails) apiAsteroidDetails.value = '';
 
   try {
@@ -1852,7 +2123,8 @@ function populateApiSelect() {
   if (!filteredCatalog || !filteredCatalog.length) {
     const option = document.createElement('option');
     option.value = '';
-    option.textContent = 'No hay datos disponibles';
+    option.setAttribute('data-i18n', 'message.noDataAvailable');
+    option.textContent = translate('message.noDataAvailable') || 'No hay datos disponibles';
     apiAsteroidSelect.appendChild(option);
     apiAsteroidSelect.disabled = true;
     return;
@@ -1887,13 +2159,13 @@ function updateApiDetails() {
   
   const idx = Number(apiAsteroidSelect.value);
   if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
-    apiAsteroidDetails.value = 'Selecciona un objeto del catálogo';
+    apiAsteroidDetails.value = translate('message.selectFromCatalog') || 'Selecciona un objeto del catálogo';
     return;
   }
   
   const object = filteredCatalog[idx];
   if (!object) {
-    apiAsteroidDetails.value = 'No hay datos disponibles';
+    apiAsteroidDetails.value = translate('message.noDataAvailable') || 'No hay datos disponibles';
     return;
   }
 
@@ -1928,10 +2200,11 @@ if (apiAsteroidSelect) {
 
 function setViewerMode(mode) {
   viewerMode = mode;
+  const dict = translations[currentLanguage] || translations.es;
   if (mode === 'manual') {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');
-    modeToggle.textContent = 'Modo Manual';
+    if (modeToggle) modeToggle.textContent = dict['viewer.modeManual'] || 'Modo Manual';
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
     updateViewerRotationSpeed();
     regenerateMeteorite({
@@ -1941,7 +2214,7 @@ function setViewerMode(mode) {
   } else {
     manualControls.classList.add('hidden');
     apiControls.classList.remove('hidden');
-    modeToggle.textContent = 'Modo API';
+    if (modeToggle) modeToggle.textContent = dict['viewer.modeApi'] || 'Modo API';
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
     
     // Usar el catálogo actual en lugar de datos mock
@@ -2011,6 +2284,133 @@ simulateBtn.addEventListener('click', () => {
   animateImpact(data.impactLat, data.impactLon);
 });
 
+const accessibilityMenuButton = document.getElementById('accessibilityMenuButton');
+const accessibilityMenu = document.getElementById('accessibilityMenu');
+const faqModal = document.getElementById('faqModal');
+const faqOverlay = document.getElementById('faqOverlay');
+const faqCloseBtn = document.getElementById('faqCloseBtn');
+const faqOpenBtn = document.getElementById('faq-open-btn');
+
+function isMenuOpen() {
+  return accessibilityMenu && !accessibilityMenu.classList.contains('hidden');
+}
+
+function openAccessibilityMenu() {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  accessibilityMenu.classList.remove('hidden');
+  accessibilityMenuButton.setAttribute('aria-expanded', 'true');
+}
+
+function closeAccessibilityMenu() {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  accessibilityMenu.classList.add('hidden');
+  accessibilityMenuButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleAccessibilityMenu() {
+  if (!accessibilityMenu) return;
+  if (isMenuOpen()) closeAccessibilityMenu(); else openAccessibilityMenu();
+}
+
+function isFaqOpen() {
+  return faqModal && !faqModal.classList.contains('hidden');
+}
+
+function openFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  closeAccessibilityMenu();
+  setTimeout(() => {
+    if (faqCloseBtn) faqCloseBtn.focus();
+  }, 0);
+}
+
+function closeFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  setTimeout(() => {
+    if (faqOpenBtn) {
+      faqOpenBtn.focus();
+    } else if (accessibilityMenuButton) {
+      accessibilityMenuButton.focus();
+    }
+  }, 0);
+}
+
+if (accessibilityMenuButton) {
+  accessibilityMenuButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    toggleAccessibilityMenu();
+  });
+}
+
+document.addEventListener('click', (event) => {
+  if (!accessibilityMenu || !accessibilityMenuButton) return;
+  const withinMenu = accessibilityMenu.contains(event.target);
+  const isButton = accessibilityMenuButton.contains(event.target);
+  if (!withinMenu && !isButton) {
+    closeAccessibilityMenu();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    if (isFaqOpen()) {
+      closeFaqModal();
+      event.preventDefault();
+      return;
+    }
+    if (isMenuOpen()) {
+      closeAccessibilityMenu();
+      event.preventDefault();
+    }
+  }
+});
+
+if (faqOpenBtn) {
+  faqOpenBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    openFaqModal();
+  });
+}
+
+if (faqOverlay) {
+  faqOverlay.addEventListener('click', closeFaqModal);
+}
+
+if (faqCloseBtn) {
+  faqCloseBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeFaqModal();
+  });
+}
+
+document.querySelectorAll('[data-lang-option]').forEach((btn) => {
+  btn.addEventListener('click', (event) => {
+    event.preventDefault();
+    const lang = btn.getAttribute('data-lang-option');
+    setLanguage(lang);
+    closeAccessibilityMenu();
+  });
+});
+
+(function initializeLanguage() {
+  let initialLang = 'es';
+  try {
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (stored && translations[stored]) {
+      initialLang = stored;
+    } else {
+      const browserLang = (navigator.language || navigator.userLanguage || '').slice(0, 2);
+      if (translations[browserLang]) initialLang = browserLang;
+    }
+  } catch (_) {}
+  setLanguage(initialLang);
+  window.setLanguage = setLanguage;
+})();
+
 // Accesibilidad: botón de modo daltónico (toggle en <body>)
 (function(){
   const colorToggleButton = document.getElementById('color-toggle-btn');
@@ -2025,6 +2425,7 @@ simulateBtn.addEventListener('click', () => {
     try {
       localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
     } catch (_) {}
+    closeAccessibilityMenu();
   });
 })();
 
