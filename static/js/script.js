@@ -17,7 +17,7 @@ let effectLayers = [];
 let seismicLayer = null;
 let populationLayer = null;
 let moonAngle = 0;
-let moonOrbitRadius = 2;
+let moonOrbitRadius = 0.75;
 let moonOrbitSpeed = 0.01;
 let orbitControls = null;
 let avDragging = false;
@@ -528,6 +528,7 @@ function createPlanet({
     return mesh;
 }
 
+
 // --- Inicialización principal ---
 function initThree() {
     if (!THREE_NS) {
@@ -551,7 +552,7 @@ function initThree() {
 
     // --- Cámara ---
     camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 2000);
-    camera.position.set(0, 0, 15); 
+    camera.position.set(0, 0, 5); 
     scene.add(camera);
 
     // --- Fondo estelar ---
@@ -578,7 +579,7 @@ function initThree() {
     solarSystemGroup.add(sunGroup);
 
     // ☀️ Sol (emite luz propia)
-    const sunGeometry = new THREE_NS.SphereGeometry(1.5, 64, 64);
+    const sunGeometry = new THREE_NS.SphereGeometry(.2, 64, 64);
     const sunTexture = new THREE_NS.TextureLoader().load(
         'static/textures/sol.jpg',
         () => console.log('🪐 Textura de Sol cargada'),
@@ -618,7 +619,7 @@ function initThree() {
     // 🌍 Tierra
     earthMesh = createPlanet({
         name: 'Tierra',
-        radius: 0.7,
+        radius: 0.1,
         texturePath: 'static/textures/planeta.jpg'
     });
     earthGroup.add(earthMesh);
@@ -627,7 +628,7 @@ function initThree() {
     const cloudsMesh = createPlanet({
         name: 'Nubes',
         texturePath: 'static/textures/fair_clouds_4k.png',
-        radius: 0.71,
+        radius: 0.102,
         shininess: 0,
         specular: 0,
         transparent: true,
@@ -641,7 +642,7 @@ function initThree() {
     moonMesh = createPlanet({
         name: 'Luna',
         texturePath: 'static/textures/luna.jpg',
-        radius: 0.27,
+        radius: 0.05,
         segments: 32,
         shininess: 5,
         specular: 0x111111
@@ -664,40 +665,208 @@ function initThree() {
 }
 
 
+// --- Crear la órbita de un asteroide o cometa ---
+let currentOrbitLine = null;
+let orbitalMeteorite = null;
+let orbitalAnimationId = null;
+let orbitalTime = 0;
+
+function createOrbitFromElements(objectData) {
+    // Limpiar órbitas y meteoritos anteriores
+    if (currentOrbitLine) {
+        solarSystemGroup.remove(currentOrbitLine);
+        currentOrbitLine.geometry.dispose();
+        currentOrbitLine.material.dispose();
+        currentOrbitLine = null;
+    }
+    
+    if (orbitalMeteorite) {
+        solarSystemGroup.remove(orbitalMeteorite);
+        orbitalMeteorite.geometry.dispose();
+        orbitalMeteorite.material.dispose();
+        orbitalMeteorite = null;
+    }
+    
+    if (orbitalAnimationId) {
+        cancelAnimationFrame(orbitalAnimationId);
+        orbitalAnimationId = null;
+    }
+
+    if (!objectData || !objectData.a || !objectData.e) {
+        console.warn('❌ No hay datos suficientes para crear órbita.');
+        return null;
+    }
+
+    const a = objectData.a; // semieje mayor (UA)
+    const e = objectData.e; // excentricidad
+    const i = THREE.MathUtils.degToRad(objectData.i || 0); // inclinación
+    const omega = THREE.MathUtils.degToRad(objectData.omega || 0); // nodo ascendente (Ω)
+    const argPeriapsis = THREE.MathUtils.degToRad(objectData.argPeriapsis || 0); // argumento del perihelio (ω)
+
+    const numPoints = 360; // resolución de la elipse
+    const curvePoints = [];
+
+    for (let θ = 0; θ < 2 * Math.PI; θ += (2 * Math.PI / numPoints)) {
+        // Ecuación de una elipse (en el plano orbital)
+        const r = (a * (1 - e * e)) / (1 + e * Math.cos(θ));
+        const x = r * Math.cos(θ);
+        const y = r * Math.sin(θ);
+        curvePoints.push(new THREE.Vector3(x, y, 0));
+    }
+
+    // Aplicar rotaciones orbitales
+    const curveGeometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+    const curveMaterial = new THREE.LineBasicMaterial({
+        color: 0xffa500, // naranja brillante
+        linewidth: 2
+    });
+
+    const orbitLine = new THREE.LineLoop(curveGeometry, curveMaterial);
+
+    // Crear matriz de rotación (ω, i, Ω)
+    const orbitMatrix = new THREE.Matrix4();
+    orbitMatrix.makeRotationZ(argPeriapsis); // rotación del perihelio
+    orbitMatrix.multiply(new THREE.Matrix4().makeRotationX(i)); // inclinación
+    orbitMatrix.multiply(new THREE.Matrix4().makeRotationZ(omega)); // nodo ascendente
+
+    orbitLine.applyMatrix4(orbitMatrix);
+
+    // Escalar a una distancia visible
+    const AU_SCALE = 3;
+    orbitLine.scale.set(AU_SCALE, AU_SCALE, AU_SCALE);
+
+    // Agregar la órbita al sistema solar
+    currentOrbitLine = orbitLine;
+    solarSystemGroup.add(orbitLine);
+
+    // 🪨 Crear el meteorito (pequeña esfera) y animarlo en la órbita
+    const asteroidGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+    const asteroidMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff4500, // naranja/rojo
+        emissive: 0xff4500,
+        emissiveIntensity: 0.4
+    });
+    orbitalMeteorite = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+    solarSystemGroup.add(orbitalMeteorite);
+
+    // Función para calcular la posición en la órbita en función del tiempo
+    function calculateOrbitalPosition(time) {
+        // Calcular la anomalía media (simulando movimiento orbital)
+        const meanAnomaly = (time * 0.5) % (2 * Math.PI);
+        
+        // Resolver la ecuación de Kepler para la anomalía excéntrica (aproximación simple)
+        let eccentricAnomaly = meanAnomaly;
+        for (let j = 0; j < 3; j++) {
+            eccentricAnomaly = meanAnomaly + e * Math.sin(eccentricAnomaly);
+        }
+        
+        // Calcular la anomalía verdadera
+        const trueAnomaly = 2 * Math.atan2(
+            Math.sqrt(1 + e) * Math.sin(eccentricAnomaly / 2),
+            Math.sqrt(1 - e) * Math.cos(eccentricAnomaly / 2)
+        );
+        
+        // Calcular la distancia radial
+        const r = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomaly));
+        
+        // Posición en el plano orbital
+        const x = r * Math.cos(trueAnomaly);
+        const y = r * Math.sin(trueAnomaly);
+        
+        return new THREE.Vector3(x, y, 0);
+    }
+
+    // Función de animación del meteorito orbital
+    function animateOrbitalMeteorite() {
+        if (!orbitalMeteorite) return;
+        
+        orbitalTime += 0.016; // Aproximadamente 60 FPS
+        
+        // Calcular posición orbital
+        const orbitalPos = calculateOrbitalPosition(orbitalTime);
+        
+        // Aplicar las mismas transformaciones orbitales que a la línea
+        orbitalPos.applyMatrix4(orbitMatrix);
+        orbitalPos.multiplyScalar(AU_SCALE);
+        
+        // Actualizar posición del meteorito
+        orbitalMeteorite.position.copy(orbitalPos);
+        
+        // Rotación del meteorito sobre su eje
+        orbitalMeteorite.rotation.x += 0.01;
+        orbitalMeteorite.rotation.y += 0.02;
+        
+        orbitalAnimationId = requestAnimationFrame(animateOrbitalMeteorite);
+    }
+
+    // Iniciar animación
+    animateOrbitalMeteorite();
+
+    console.log(`🌀 Órbita y meteorito añadidos para ${objectData.name}`);
+    return orbitLine;
+}
+
+let zoomLevel = 0;
+
 
 // --- Botón de seguimiento ---
 function setupFollowButton() {
     const button = document.createElement('button');
-    button.textContent = 'Centrar en Tierra 🌍';
-    button.id = 'followEarthButton';
-    
-    button.style.position = 'absolute';
-    button.style.bottom = '10px';
-    button.style.left = '10px';
-    button.style.padding = '8px 15px';
-    button.style.zIndex = '1000';
-    button.style.backgroundColor = 'rgba(60, 179, 113, 0.8)';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
+    button.textContent = 'Vista general 🌌';
+    button.id = 'zoomCycleButton';
+
+    Object.assign(button.style, {
+        position: 'absolute',
+        bottom: '10px',
+        left: '10px',
+        padding: '8px 15px',
+        zIndex: '1000',
+        backgroundColor: 'rgba(60, 179, 113, 0.8)',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer'
+    });
 
     document.body.appendChild(button);
 
+    const scaleGeneral = new THREE.Vector3(1, 1, 1);
+    const scaleSunView = new THREE.Vector3(5, 5, 5);
+    const scaleEarthView = new THREE.Vector3(10, 10, 10);
+
     button.addEventListener('click', () => {
-        isFollowingEarth = !isFollowingEarth;
-        if (isFollowingEarth) {
-            button.textContent = 'Dejar de Seguir';
-            camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
-        } else {
+        zoomLevel = (zoomLevel + 1) % 3;
+
+        if (zoomLevel === 0) {
+            // 🌌 Vista general
+            button.textContent = 'Vista general 🌌';
+            isFollowingEarth = false;
+            solarSystemGroup.scale.copy(scaleGeneral);
+            camera.position.set(0, 0, 5);
+            camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+        } else if (zoomLevel === 1) {
+            // ☀️ Centrar en Sol
+            button.textContent = 'Centrar en Sol ☀️';
+            isFollowingEarth = false;
+            solarSystemGroup.scale.copy(scaleSunView);
+            
+            const sunPos = new THREE.Vector3();
+            sunMesh.getWorldPosition(sunPos);
+            camera.position.copy(sunPos).add(new THREE.Vector3(0, 0, 5));
+            camera.lookAt(sunPos);
+
+        } else if (zoomLevel === 2) {
+            // 🌍 Centrar en Tierra
             button.textContent = 'Centrar en Tierra 🌍';
-            camera.position.set(0, 0, 15);
-            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
+            isFollowingEarth = true; // 🔥 Activar seguimiento automático
+            solarSystemGroup.scale.copy(scaleEarthView);
         }
     });
 }
 
 // --- Botón para reiniciar el Sistema Solar ---
+
 function setupResetSystemButton() {
     const button = document.createElement('button');
     button.textContent = 'Reiniciar Sistema Solar 🔄';
@@ -762,7 +931,7 @@ function setupResetSystemButton() {
             // Si no estamos centrados en la Tierra, volver a vista general
             const followButton = document.getElementById('followEarthButton');
             if (followButton) followButton.textContent = 'Centrar en Tierra 🌍';
-            camera.position.set(0, 0, 15);
+            camera.position.set(0, 0, 5);
             camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
         }
 
@@ -810,15 +979,17 @@ function animate() {
     }
 
     // 🚀 Seguimiento de la Tierra
-    if (isFollowingEarth) {
+    if (isFollowingEarth && earthGroup) {
         const earthPosition = new THREE_NS.Vector3();
         earthGroup.getWorldPosition(earthPosition);
-        const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
-        const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
-        relativeOffset.applyMatrix4(matrix);
-        camera.position.copy(earthPosition).add(relativeOffset);
+
+        // Offset fijo
+        const desiredOffset = new THREE_NS.Vector3(0, 0.5, 3); 
+        camera.position.copy(earthPosition).add(desiredOffset);
         camera.lookAt(earthPosition);
     }
+
+    
 
     // 🌌 Movimiento lento del fondo
     starSphere.rotation.y += 0.00005;
@@ -1226,6 +1397,17 @@ function computeAndDisplayImpactProbability(selectedObject, opts = {}) {
 
   const params = { a, e, inc };
   console.log(`[${source}] 2. Parámetros para la función:`, params);
+
+
+  // 🪐 Dibujar la órbita del objeto seleccionado
+  createOrbitFromElements({
+    name: selectedObject.object_fullname || selectedObject.name || 'Objeto desconocido',
+    a: params.a,
+    e: params.e,
+    i: params.inc,
+    omega: parseNum(raw.node || raw.long_asc_node || raw.omega),       // Ω - nodo ascendente
+    argPeriapsis: parseNum(raw.peri || raw.arg_periapsis || raw.w),    // ω - argumento del perihelio
+  });
 
   // 3. Calcular y registrar el resultado crudo
   let result = null;
