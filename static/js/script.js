@@ -63,6 +63,8 @@ const openAsteroidViewerBtn = document.getElementById('openAsteroidViewerBtn');
 const modeToggle = document.getElementById('modeToggle');
 const manualControls = document.getElementById('manualControls');
 const apiControls = document.getElementById('apiControls');
+const manDiameter = document.getElementById('manDiameter');
+const manDiameterValue = document.getElementById('manDiameterValue');
 const manSpeed = document.getElementById('manSpeed');
 const manDensity = document.getElementById('manDensity');
 const manRotation = document.getElementById('manRotation');
@@ -539,16 +541,173 @@ initThree();
 let viewerMode = 'manual'; // 'manual' | 'api'
 
 // TODO: Reemplazar esta lista con los datos de la API real.
-const mockAsteroids = [
-  { name: "Ceres-M", diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1 },
-  { name: "Pallas-M", diameter: 512, velocity: 16.5, density: 2800, rotation_period: 7.8 },
-  { name: "Vesta-M", diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3 },
-  { name: "Hygiea-M", diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8 },
-  { name: "Apophis-M", diameter: 0.37, velocity: 30.7, density: 2600, rotation_period: 30.6 }
+const mockAsteroidDatabase = [
+  { name: "Asteroide Bennu (Ejemplo)", diameter: 0.49, velocity: 28.0, density: 1260, rotation_period: 4.3, seed: 101, a: 1.126, e: 0.204, i: 6.035 },
+  { name: "Asteroide Apophis (Ejemplo)", diameter: 0.37, velocity: 30.7, density: 3260, rotation_period: 30.6, seed: 256, a: 0.922, e: 0.191, i: 3.331 },
+  { name: "Planetoide Ceres (Grande)", diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1, seed: 512, a: 2.77, e: 0.08, i: 10.59 },
+  { name: "Asteroide Vesta", diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3, seed: 768, a: 2.36, e: 0.089, i: 7.14 },
+  { name: "Asteroide Hygiea", diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8, seed: 903, a: 3.14, e: 0.119, i: 3.83 }
 ];
 
 // Three.js para el visor de asteroides
 let avRenderer, avScene, avCamera, avAsteroid, avLight;
+let meteoriteState = {
+  diameterKM: 50,
+  seed: 42
+};
+
+function densityToSeed(density) {
+  const min = manDensity ? Number(manDensity.min) || 1 : 1;
+  const max = manDensity ? Number(manDensity.max) || Math.max(min + 1, density) : 8000;
+  const clamped = Math.min(Math.max(density, min), max);
+  const normalized = (clamped - min) / (max - min || 1);
+  return Math.max(1, Math.round(normalized * 999) + 1);
+}
+
+function seedToDensity(seed) {
+  if (!manDensity) return seed;
+  const min = Number(manDensity.min) || 1;
+  const max = Number(manDensity.max) || 8000;
+  const normalized = (Math.max(1, seed) - 1) / 999;
+  return Math.round(min + normalized * (max - min));
+}
+
+function diameterToSceneRadius(diameterKm) {
+  const sanitized = Math.max(0.1, Number(diameterKm) || 1);
+  const radius = Math.cbrt(sanitized) * 0.2;
+  return Math.min(3.0, Math.max(0.25, radius));
+}
+
+function seededRandom(seed) {
+  let value = Math.max(1, Math.floor(seed) || 1);
+  return function () {
+    value = (value * 9301 + 49297) % 233280;
+    return value / 233280;
+  };
+}
+
+function createProceduralTexture(seed, offsets) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.createImageData(canvas.width, canvas.height);
+  const data = imageData.data;
+  const texRandom = seededRandom(seed + 1000);
+  const { offsetX, offsetY, offsetZ } = offsets;
+
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const i = (y * canvas.width + x) * 4;
+
+      const noise1 = Math.sin((x + offsetX * 5) * 0.05) * Math.cos(y * 0.05);
+      const noise2 = Math.sin(x * 0.1 + noise1) * Math.cos((y + offsetY * 5) * 0.1);
+      const noise3 = Math.sin(x * 0.02) * Math.sin((y + offsetZ * 5) * 0.02);
+      const noise4 = Math.sin(x * 0.2 + y * 0.15) * 0.5;
+      const combined = noise1 * 0.3 + noise2 * 0.3 + noise3 * 0.2 + noise4 * 0.2;
+      const randomVal = (texRandom() - 0.5) * 0.3;
+
+      const baseColor = 50 + combined * 40 + randomVal * 30;
+      const r = baseColor + texRandom() * 20;
+      const g = baseColor * 0.9 + texRandom() * 15;
+      const b = baseColor * 0.8 + texRandom() * 10;
+
+      data[i] = Math.max(0, Math.min(255, r));
+      data[i + 1] = Math.max(0, Math.min(255, g));
+      data[i + 2] = Math.max(0, Math.min(255, b));
+      data[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  const texture = new THREE_NS.CanvasTexture(canvas);
+  texture.wrapS = THREE_NS.RepeatWrapping;
+  texture.wrapT = THREE_NS.RepeatWrapping;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function createMeteoriteMesh(diameterKm, seed) {
+  const radius = diameterToSceneRadius(diameterKm);
+  const geometry = new THREE_NS.SphereGeometry(radius, 96, 96);
+  const positions = geometry.attributes.position;
+  const random = seededRandom(seed);
+  const offsetX = random() * 100;
+  const offsetY = random() * 100;
+  const offsetZ = random() * 100;
+
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+
+    const noise1 = Math.sin((x + offsetX) * 1.5 + y * 0.8) * Math.cos(z * 1.2);
+    const noise2 = Math.sin(y * 1.8 + (z + offsetY) * 1.0) * Math.cos(x * 1.5);
+    const noise3 = Math.sin((z + offsetZ) * 1.3 + x * 1.1) * Math.cos(y * 1.6);
+    const combinedNoise = noise1 * 0.35 + noise2 * 0.35 + noise3 * 0.3;
+    const craterNoise = Math.sin(x * 3) * Math.sin(y * 3) * Math.sin(z * 3);
+    const displacement = combinedNoise * 0.25 + craterNoise * 0.1;
+
+    const length = Math.sqrt(x * x + y * y + z * z) || 1;
+    const scale = 1 + displacement;
+    positions.setXYZ(
+      i,
+      (x / length) * radius * scale,
+      (y / length) * radius * scale,
+      (z / length) * radius * scale
+    );
+  }
+
+  geometry.computeVertexNormals();
+  const texture = createProceduralTexture(seed, { offsetX, offsetY, offsetZ });
+  const material = new THREE_NS.MeshPhongMaterial({
+    map: texture,
+    shininess: 5,
+    specular: 0x111111,
+    flatShading: false
+  });
+
+  return new THREE_NS.Mesh(geometry, material);
+}
+
+function disposeMesh(mesh) {
+  if (!mesh) return;
+  if (mesh.geometry) mesh.geometry.dispose();
+  const mat = mesh.material;
+  if (Array.isArray(mat)) {
+    mat.forEach(disposeMaterial);
+  } else if (mat) {
+    disposeMaterial(mat);
+  }
+  if (mesh.parent) mesh.parent.remove(mesh);
+}
+
+function disposeMaterial(material) {
+  if (material.map && typeof material.map.dispose === 'function') material.map.dispose();
+  material.dispose();
+}
+
+function regenerateMeteorite(overrides = {}) {
+  meteoriteState = {
+    diameterKM: overrides.diameterKM !== undefined ? Number(overrides.diameterKM) : meteoriteState.diameterKM,
+    seed: overrides.seed !== undefined ? Number(overrides.seed) : meteoriteState.seed
+  };
+  if (!avScene) return;
+  disposeMesh(avAsteroid);
+  avAsteroid = createMeteoriteMesh(meteoriteState.diameterKM, meteoriteState.seed);
+  avScene.add(avAsteroid);
+  updateViewerRotationSpeed();
+}
+
+function updateViewerRotationSpeed() {
+  const degPerSec = Number(manRotation ? manRotation.value : 5);
+  const speed = Number(manSpeed ? manSpeed.value : 10);
+  const speedFactor = 0.5 + speed / 60;
+  avRotSpeed = (degPerSec * Math.PI / 180) * 0.016 * speedFactor;
+}
+
+meteoriteState.diameterKM = manDiameter ? Number(manDiameter.value) : meteoriteState.diameterKM;
+meteoriteState.seed = manDensity ? densityToSeed(Number(manDensity.value)) : meteoriteState.seed;
 
 function initAsteroidViewerThree() {
   if (!THREE_NS) {
@@ -567,18 +726,23 @@ function initAsteroidViewerThree() {
   avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
   avCamera.position.set(0, 0, 3);
 
-  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.6); avScene.add(ambient);
-  avLight = new THREE_NS.DirectionalLight(0xffffff, 1.0); avLight.position.set(3, 2, 4); avScene.add(avLight);
+  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.3);
+  avScene.add(ambient);
 
-  const geo = new THREE_NS.SphereGeometry(1, 64, 64);
-  const loader = new THREE_NS.TextureLoader();
-  loader.load('./static/textures/asteroid-texture.jpg', (tex) => {
-    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 }));
-    avScene.add(avAsteroid);
-  }, undefined, () => {
-    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ color: 0x8a7f70 }));
-    avScene.add(avAsteroid);
-  });
+  avLight = new THREE_NS.DirectionalLight(0xffffff, 0.8);
+  avLight.position.set(3, 2, 4);
+  avScene.add(avLight);
+
+  const dirLight2 = new THREE_NS.DirectionalLight(0xffaa66, 0.35);
+  dirLight2.position.set(-4, -2, 3);
+  avScene.add(dirLight2);
+
+  const rimLight = new THREE_NS.PointLight(0x6688ff, 0.4, 10);
+  rimLight.position.set(-2, 1, -3);
+  avScene.add(rimLight);
+
+  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed: meteoriteState.seed });
+  updateViewerRotationSpeed();
 
   addAsteroidViewerControls();
   requestAnimationFrame(asteroidViewerAnimate);
@@ -609,32 +773,46 @@ function addAsteroidViewerControls() {
 }
 
 function updateManualDisplay() {
+  if (manDiameter && manDiameterValue) {
+    manDiameterValue.textContent = `${Number(manDiameter.value).toFixed(1)} km`;
+  }
   manSpeedValue.textContent = Number(manSpeed.value).toFixed(1);
   manDensityValue.textContent = `${manDensity.value} kg/m³`;
   manRotationValue.textContent = `${Number(manRotation.value).toFixed(1)} °/s`;
 }
-[manSpeed, manDensity, manRotation].forEach(el => el && el.addEventListener('input', ()=>{
-  updateManualDisplay();
-  if (viewerMode === 'manual') applyManualTo3D();
-}));
+[manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && el.addEventListener('input', updateManualDisplay));
 updateManualDisplay();
 
-function applyManualTo3D() {
-  if (!avAsteroid) return;
-  // Tamaño proporcional a densidad de forma simple (mock): escalar entre 0.5 y 1.3
-  const density = Number(manDensity.value);
-  const scale = 0.5 + (density - 500) / (8000 - 500) * (1.3 - 0.5);
-  avAsteroid.scale.setScalar(Math.max(0.3, Math.min(1.5, scale)));
-  // Velocidad de rotación: base en Rotación (°/s) modulada por Velocidad
-  const degPerSec = Number(manRotation.value);
-  const speed = Number(manSpeed.value);
-  const speedFactor = 0.5 + (speed / 60); // 0..60 -> 0.5x .. 1.5x
-  avRotSpeed = (degPerSec * Math.PI / 180) * 0.016 * speedFactor; // ~60fps
+if (manDiameter) {
+  manDiameter.addEventListener('input', () => {
+    meteoriteState.diameterKM = Number(manDiameter.value);
+    if (viewerMode === 'manual') regenerateMeteorite({ diameterKM: meteoriteState.diameterKM });
+  });
+}
+
+if (manDensity) {
+  manDensity.addEventListener('input', () => {
+    const newSeed = densityToSeed(Number(manDensity.value));
+    meteoriteState.seed = newSeed;
+    if (viewerMode === 'manual') regenerateMeteorite({ seed: newSeed });
+  });
+}
+
+if (manSpeed) {
+  manSpeed.addEventListener('input', () => {
+    if (viewerMode === 'manual') updateViewerRotationSpeed();
+  });
+}
+
+if (manRotation) {
+  manRotation.addEventListener('input', () => {
+    if (viewerMode === 'manual') updateViewerRotationSpeed();
+  });
 }
 
 function populateApiSelect() {
   apiAsteroidSelect.innerHTML = '';
-  mockAsteroids.forEach((a, idx) => {
+  mockAsteroidDatabase.forEach((a, idx) => {
     const opt = document.createElement('option');
     opt.value = String(idx);
     opt.textContent = `${a.name} — Ø ${a.diameter} km, v ${a.velocity} km/s`;
@@ -644,18 +822,47 @@ function populateApiSelect() {
 }
 
 function updateApiDetails() {
+  if (!apiAsteroidSelect || !apiAsteroidDetails) return;
   const idx = Number(apiAsteroidSelect.value || 0);
-  const a = mockAsteroids[idx];
-  if (!a) { apiAsteroidDetails.value = ''; return; }
-  apiAsteroidDetails.value = `Nombre: ${a.name}\nDiámetro: ${a.diameter} km\nVelocidad: ${a.velocity} km/s\nDensidad: ${a.density} kg/m³\nPeriodo de rotación: ${a.rotation_period} h`;
-  // Al seleccionar, actualizar sliders y 3D y desactivar sliders en modo API
-  manSpeed.value = a.velocity.toString();
-  manDensity.value = a.density.toString();
-  // Aproximación: rotación deg/s desde horas -> suponemos 360° por periodo
-  const degPerSec = 360 / (a.rotation_period * 3600);
-  manRotation.value = (degPerSec * 100).toFixed(1); // amplificar para visualización
+  const asteroid = mockAsteroidDatabase[idx];
+  if (!asteroid) {
+    apiAsteroidDetails.value = 'No hay datos disponibles';
+    return;
+  }
+
+  const infoLines = [
+    `Nombre: ${asteroid.name}`,
+    `Diámetro: ${asteroid.diameter} km`,
+    `Velocidad: ${asteroid.velocity} km/s`,
+    `Densidad: ${asteroid.density} kg/m³`,
+    `Periodo de rotación: ${asteroid.rotation_period} h`,
+    `Semilla procedural: ${asteroid.seed}`
+  ];
+  apiAsteroidDetails.value = infoLines.join('\n');
+
+  if (manDiameter) {
+    const min = Number(manDiameter.min) || 0.1;
+    const max = Number(manDiameter.max) || 1000;
+    const diameter = Math.min(Math.max(Number(asteroid.diameter) || min, min), max);
+    manDiameter.value = diameter.toFixed(1);
+    meteoriteState.diameterKM = Number(manDiameter.value);
+  }
+
+  if (manSpeed) manSpeed.value = Number(asteroid.velocity).toFixed(1);
+  if (manDensity) manDensity.value = Math.round(Number(asteroid.density)).toString();
+
+  if (manRotation) {
+    const degPerSec = 360 / Math.max(1, Number(asteroid.rotation_period) * 3600);
+    const sliderValue = Math.min(Number(manRotation.max) || 30, Math.max(Number(manRotation.min) || 0, degPerSec * 100));
+    manRotation.value = sliderValue.toFixed(1);
+  }
+
   updateManualDisplay();
-  applyManualTo3D();
+  updateViewerRotationSpeed();
+
+  const seed = Number.isFinite(asteroid.seed) ? Number(asteroid.seed) : densityToSeed(Number(manDensity.value));
+  meteoriteState.seed = seed;
+  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed });
 }
 
 apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', updateApiDetails);
@@ -666,12 +873,17 @@ function setViewerMode(mode) {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');
     modeToggle.textContent = 'Modo Manual';
-    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = false);
+    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
+    updateViewerRotationSpeed();
+    regenerateMeteorite({
+      diameterKM: Number(manDiameter ? manDiameter.value : meteoriteState.diameterKM),
+      seed: densityToSeed(Number(manDensity ? manDensity.value : meteoriteState.seed))
+    });
   } else {
     manualControls.classList.add('hidden');
     apiControls.classList.remove('hidden');
     modeToggle.textContent = 'Modo API';
-    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = true);
+    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
     populateApiSelect();
   }
 }

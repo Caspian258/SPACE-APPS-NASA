@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+
+  <meta charset="UTF-8">
+  <title>Explorador NASA - Asteroides y Cometas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b0c10;
+      color: #c5c6c7;
+      text-align: center;
+      padding: 20px;
+    }
+    h1, h2 { color: #66fcf1; }
+    input, button {
+      margin: 5px;
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      background: #45a29e;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background: #66fcf1; color: #0b0c10; }
+    ul { text-align: left; }
+    li { margin: 6px 0; }
+    a {
+      color: #66fcf1;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a:hover { color: #45a29e; text-decoration: underline; }
+    .no-confirmada {
+      color: #ff4c4c;
+      font-style: italic;
+      font-weight: bold;
+    }
+    .detalle-caja { 
+      background: #1f2833;
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(102,252,241,0.2);
+      text-align: left;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    td, th {
+      border: 1px solid #45a29e;
+      padding: 5px 10px;
+      text-align: left;
+    }
+    th {
+      background: #0b0c10;
+      color: #66fcf1;
+    }
+  </style>
+
+<!-- ✅ Three.js (versión estable con OrbitControls) -->
+<!-- ✅ Three.js clásica (compatible con scripts normales, sin module) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.124.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.124.0/examples/js/controls/OrbitControls.js"></script>
+
+
+
+</head>
+
+<body>
+  <h1>🌌 Explorador NASA</h1>
+
+  <h2>☄️ Asteroides Cercanos a la Tierra</h2>
+  <label>Fecha inicio: <input type="date" id="startDate"></label>
+  <label>Fecha fin: <input type="date" id="endDate"></label>
+  <button onclick="obtenerAsteroidesFecha()">Buscar</button>
+  <button onclick="ultimos7dias()">Últimos 7 días</button>
+  <div id="asteroides"></div>
+
+  <div id="detalleAsteroide"></div>
+
+  <h2>🌠 Cometas (Datos S3)</h2>
+  <button onclick="obtenerCometas()">Cargar Cometas</button>
+  <div id="cometas"></div>
+
+  <!-- ===================== -->
+  <!-- SCRIPT PRINCIPAL NASA -->
+  <!-- ===================== -->
+
+  </script>
+  <script>
+    const apiKey = "0f6wNWDQuL4oUdJhUWw6DHKu1Np7dald4ZESJejb";
+    // --- ASTEROIDES ---
+    async function obtenerAsteroidesFecha() {
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+      if (!start || !end) {
+        alert("Por favor selecciona ambas fechas.");
+        return;
+      }
+
+      const url = `https://api.nasa.gov/neo/rest/v1/feed?start_date=${start}&end_date=${end}&api_key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const div = document.getElementById("asteroides");
+      div.innerHTML = "";
+
+      for (let fecha in data.near_earth_objects) {
+        const lista = document.createElement("ul");
+        lista.innerHTML = `<h3>${fecha}</h3>`;
+
+        data.near_earth_objects[fecha]
+          .filter(ast => ast.is_potentially_hazardous_asteroid)
+          .forEach(ast => {
+            const nombre = ast.name;
+            const id = ast.id;
+            const tamano = ast.estimated_diameter.meters.estimated_diameter_max.toFixed(1);
+            const distancia = ast.close_approach_data?.[0]?.miss_distance?.kilometers;
+
+            let estadoOrbita = "";
+            if (/^\d{3,}/.test(nombre)) {
+              estadoOrbita = '<span style="color:#66fcf1;">✅ Órbita confirmada (numerada)</span>';
+            } else if (/^\(\d{4}/.test(nombre)) {
+              estadoOrbita = '<span style="color:#45a29e;">🪐 Órbita confirmada (Aún no catalogado)</span>';
+            } else {
+              estadoOrbita = '<span class="no-confirmada">🛰️ Órbita no confirmada</span>';
+            }
+
+            const li = document.createElement("li");
+            li.innerHTML = `
+              <a href="#" onclick="obtenerDetallesAsteroide('${id}', '${nombre.replace(/'/g, "\\'")}')">${nombre}</a> 
+              - Diámetro: ${tamano} m - Distancia mínima: ${Number(distancia).toLocaleString()} km
+              <br>${estadoOrbita}
+            `;
+
+            lista.appendChild(li);
+          });
+
+        div.appendChild(lista);
+      }
+    }
+
+    function ultimos7dias() {
+      const hoy = new Date();
+      const hace7 = new Date();
+      hace7.setDate(hoy.getDate() - 7);
+      document.getElementById("startDate").value = hace7.toISOString().split("T")[0];
+      document.getElementById("endDate").value = hoy.toISOString().split("T")[0];
+      obtenerAsteroidesFecha();
+    }
+
+    // --- DETALLES DEL ASTEROIDE ---
+    async function obtenerDetallesAsteroide(id, nombre) {
+      const url = `https://api.nasa.gov/neo/rest/v1/neo/${id}?api_key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      // Leer archivo local JSONL
+      let extraData = null;
+      try {
+        const localRes = await fetch("BaseAsteroides.jsonl");
+        const text = await localRes.text();
+        const lineas = text.trim().split("\n").map(l => JSON.parse(l));
+        extraData = lineas.find(obj =>
+          obj.full_name && obj.full_name.toLowerCase().includes(nombre.toLowerCase())
+        );
+      } catch (error) {
+        console.error("Error al leer BaseAsteroides.jsonl:", error);
+      }
+
+      const div = document.getElementById("detalleAsteroide");
+      div.innerHTML = `
+        <div class="detalle-caja">
+          <h3>🪐 Detalles del asteroide: ${nombre}</h3>
+          <p><b>ID NASA:</b> ${data.id}</p>
+          <p><b>Magnitud absoluta (H):</b> ${data.absolute_magnitude_h}</p>
+          <p><b>Diámetro estimado:</b> 
+             ${data.estimated_diameter.meters.estimated_diameter_min.toFixed(2)} m - 
+             ${data.estimated_diameter.meters.estimated_diameter_max.toFixed(2)} m</p>
+          <p><b>Peligroso:</b> ${data.is_potentially_hazardous_asteroid ? "✅ Sí" : "❌ No"}</p>
+          <p><b>Órbita:</b> ${data.orbital_data.orbit_class?.orbit_class_description || "Desconocida"}</p>
+          <p><b>Última observación:</b> ${data.orbital_data.last_observation_date}</p>
+          <p><b>Velocidad relativa:</b> ${
+            data.close_approach_data?.[0]?.relative_velocity?.kilometers_per_hour
+              ? Number(data.close_approach_data[0].relative_velocity.kilometers_per_hour).toLocaleString()
+              : "N/D"
+          } km/h</p>
+          <p><b>Distancia mínima:</b> ${
+            data.close_approach_data?.[0]?.miss_distance?.kilometers
+              ? Number(data.close_approach_data[0].miss_distance.kilometers).toLocaleString()
+              : "N/D"
+          } km</p>
+
+          <hr>
+          <h4>📘 Datos adicionales (BaseAsteroides.jsonl):</h4>
+          ${
+            extraData
+              ? generarTablaAtributos(extraData)
+              : "<p><i>No se encontraron datos adicionales en la base local.</i></p>"
+          }
+        </div>
+      `;
+
+      if (extraData) {
+        dibujarOrbita(extraData);
+      } else {
+        console.warn("No hay datos orbitales para este asteroide.");
+      }
+    }
+
+    function generarTablaAtributos(obj) {
+      let filas = "";
+      for (let [clave, valor] of Object.entries(obj)) {
+        if (clave === "diameter") continue;
+        filas += `<tr><th>${clave}</th><td>${valor}</td></tr>`;
+      }
+      return `<table>${filas}</table>`;
+    }
+
+    // --- COMETAS ---
+    async function obtenerCometas() {
+      const url = "Comets.json";
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const div = document.getElementById("cometas");
+      div.innerHTML = "";
+      const lista = document.createElement("ul");
+
+      data.slice(0, 20).forEach(cometa => {
+        const li = document.createElement("li");
+        li.textContent = `${cometa.object_name} - Perihelio: ${cometa.q_au_1} AU - Excentricidad: ${cometa.e}`;
+        lista.appendChild(li);
+      });
+
+      div.appendChild(lista);
+    }
+  </script>
+
+  <!-- ========================= -->
+  <!-- SECCIÓN DE DIBUJO 3D ORBITA -->
+  <!-- ========================= -->
+  <script>
+    function dibujarOrbita(extraData) {
+      if (!extraData || typeof THREE === "undefined") {
+        console.warn("THREE no cargado o datos inválidos.");
+        return;
+      }
+
+      const anterior = document.getElementById("orbita3d");
+      if (anterior) anterior.remove();
+
+      const cont = document.createElement("div");
+      cont.id = "orbita3d";
+      cont.style.width = "100%";
+      cont.style.height = "400px";
+      cont.style.marginTop = "20px";
+      cont.style.border = "1px solid #45a29e";
+      cont.style.borderRadius = "8px";
+      document.getElementById("detalleAsteroide").appendChild(cont);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+
+      const camera = new THREE.PerspectiveCamera(60, cont.clientWidth / 400, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(cont.clientWidth, 400);
+      cont.appendChild(renderer.domElement);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      const light = new THREE.PointLight(0xffffff, 2);
+      scene.add(light);
+
+      const sun = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 32, 32),
+        new THREE.MeshBasicMaterial({ color: 0xffff00 })
+      );
+      scene.add(sun);
+
+      const ptsT = [];
+      for (let t = 0; t <= 2 * Math.PI; t += 0.05) {
+        ptsT.push(new THREE.Vector3(Math.cos(t), 0, Math.sin(t)));
+      }
+      scene.add(new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(ptsT),
+        new THREE.LineBasicMaterial({ color: 0x00aaff })
+      ));
+
+      const tierra = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0x00aaff })
+      );
+      tierra.position.set(1, 0, 0);
+      scene.add(tierra);
+
+      const a = parseFloat(extraData.a);
+      const e = parseFloat(extraData.e);
+      const i = parseFloat(extraData.i);
+      const om = parseFloat(extraData.om);
+      const w = parseFloat(extraData.w);
+      const E_rad = parseFloat(extraData.E_rad);
+
+      if ([a, e, i, om, w, E_rad].some(isNaN)) {
+        console.warn("Datos orbitales inválidos:", extraData);
+        return;
+      }
+
+      const escala = 1 / Math.max(1, a / 2);
+      const factor = 1 * escala;
+
+      const pts = [];
+      for (let E = 0; E <= 2 * Math.PI; E += 0.02) {
+        const x = a * (Math.cos(E) - e);
+        const y = a * Math.sqrt(1 - e * e) * Math.sin(E);
+        pts.push(new THREE.Vector3(x * factor, y * factor, 0));
+      }
+
+      const mat = new THREE.Matrix4();
+      mat.makeRotationZ(THREE.MathUtils.degToRad(om))
+         .multiply(new THREE.Matrix4().makeRotationX(THREE.MathUtils.degToRad(i)))
+         .multiply(new THREE.Matrix4().makeRotationZ(THREE.MathUtils.degToRad(w)));
+      pts.forEach(p => p.applyMatrix4(mat));
+
+      const orbita = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0xff6600 })
+      );
+      scene.add(orbita);
+
+      const r = a * (1 - e * e) / (1 + e * Math.cos(E_rad));
+      const pos = new THREE.Vector3(r * Math.cos(E_rad) * factor, r * Math.sin(E_rad) * factor, 0);
+      pos.applyMatrix4(mat);
+
+      const ast = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xff6600 })
+      );
+      ast.position.copy(pos);
+      scene.add(ast);
+
+      camera.position.set(2 * factor, 2 * factor, 3 * factor);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+  </script>
+
+</body>
+</html>
