@@ -190,23 +190,6 @@ const threeContainer = document.getElementById('globe3D') || {
     innerHTML: '', 
     appendChild: () => {} 
 };
-
-  // --- Cámara ---
-  camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 2000);
-  camera.position.set(0, 0, 6);
-  scene.add(camera);
-
-  // --- Luces ---
-  scene.add(new THREE_NS.AmbientLight(0x333333, 0.3));
-  
-  sunLight = new THREE_NS.DirectionalLight(0xffffff, 1.5);
-  sunLight.position.set(5, 3, 5);
-  sunLight.castShadow = true;
-  sunLight.shadow.mapSize.width = 2048;
-  sunLight.shadow.mapSize.height = 2048;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 80;
-  scene.add(sunLight);
 // --- Función genérica para crear planetas ---
 function createPlanet({
     name,
