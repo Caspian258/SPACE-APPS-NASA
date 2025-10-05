@@ -1377,6 +1377,18 @@ datasetViewerRadios.forEach((radio) => {
   });
 });
 
+if (document.querySelectorAll('input[name="datasetViewer"]').length > 0) {
+  document.querySelectorAll('input[name="datasetViewer"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      if (this.value === 'asteroids') {
+        switchDataset('asteroids', { origin: 'viewer', forceReload: false });
+      } else {
+        switchDataset('comets', { origin: 'viewer', forceReload: false });
+      }
+    });
+  });
+}
+
 [
   [filterNameInput, ['input']],
   [filterMinDiameterInput, ['input', 'change']],
@@ -1832,61 +1844,87 @@ if (manRotation) {
 }
 
 function populateApiSelect() {
+  if (!apiAsteroidSelect) return;
+  
   apiAsteroidSelect.innerHTML = '';
-  mockAsteroidDatabase.forEach((a, idx) => {
+  
+  // Usar el catálogo filtrado actual
+  if (!filteredCatalog || !filteredCatalog.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No hay datos disponibles';
+    apiAsteroidSelect.appendChild(option);
+    apiAsteroidSelect.disabled = true;
+    return;
+  }
+  
+  filteredCatalog.forEach((item, index) => {
     const opt = document.createElement('option');
-    opt.value = String(idx);
-    opt.textContent = `${a.name} — Ø ${a.diameter} km, v ${a.velocity} km/s`;
+    opt.value = String(index);
+    
+    // Formato consistente con el panel principal
+    const diameter = Number.isFinite(item.diameterKm) ? `${item.diameterKm.toFixed(1)}` : 'N/D';
+    const velocity = Number.isFinite(item.velocity) ? `${item.velocity.toFixed(1)}` : 'N/D';
+    
+    opt.textContent = `${item.name} — Ø ${diameter} km, v ${velocity} km/s`;
     apiAsteroidSelect.appendChild(opt);
   });
+  
+  apiAsteroidSelect.disabled = false;
+  
+  // Seleccionar el objeto actual si existe, de lo contrario el primero
+  let selectedIndex = 0;
+  if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
+    selectedIndex = currentObjectIndex;
+  }
+  
+  apiAsteroidSelect.value = String(selectedIndex);
   updateApiDetails();
 }
 
 function updateApiDetails() {
   if (!apiAsteroidSelect || !apiAsteroidDetails) return;
-  const idx = Number(apiAsteroidSelect.value || 0);
-  const asteroid = mockAsteroidDatabase[idx];
-  if (!asteroid) {
+  
+  const idx = Number(apiAsteroidSelect.value);
+  if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+    apiAsteroidDetails.value = 'Selecciona un objeto del catálogo';
+    return;
+  }
+  
+  const object = filteredCatalog[idx];
+  if (!object) {
     apiAsteroidDetails.value = 'No hay datos disponibles';
     return;
   }
 
-  const infoLines = [
-    `Nombre: ${asteroid.name}`,
-    `Diámetro: ${asteroid.diameter} km`,
-    `Velocidad: ${asteroid.velocity} km/s`,
-    `Densidad: ${asteroid.density} kg/m³`,
-    `Periodo de rotación: ${asteroid.rotation_period} h`,
-    `Semilla procedural: ${asteroid.seed}`
-  ];
-  apiAsteroidDetails.value = infoLines.join('\n');
-
-  if (manDiameter) {
-    const min = Number(manDiameter.min) || 0.1;
-    const max = Number(manDiameter.max) || 1000;
-    const diameter = Math.min(Math.max(Number(asteroid.diameter) || min, min), max);
-    manDiameter.value = diameter.toFixed(1);
-    meteoriteState.diameterKM = Number(manDiameter.value);
-  }
-
-  if (manSpeed) manSpeed.value = Number(asteroid.velocity).toFixed(1);
-  if (manDensity) manDensity.value = Math.round(Number(asteroid.density)).toString();
-
-  if (manRotation) {
-    const degPerSec = 360 / Math.max(1, Number(asteroid.rotation_period) * 3600);
-    const sliderValue = Math.min(Number(manRotation.max) || 30, Math.max(Number(manRotation.min) || 0, degPerSec * 100));
-    manRotation.value = sliderValue.toFixed(1);
-  }
-
-  updateManualDisplay();
-  updateViewerRotationSpeed();
-
-  const seed = Number.isFinite(asteroid.seed) ? Number(asteroid.seed) : densityToSeed(Number(manDensity.value));
-  meteoriteState.seed = seed;
-  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed });
+  // Usar la función de formato existente
+  apiAsteroidDetails.value = formatObjectDetails(object);
+  
+  // Actualizar el objeto activo globalmente
+  setActiveObjectByIndex(idx, { 
+    updateViewer: true, 
+    updateDetails: false, 
+    updateProbability: true 
+  });
 }
 
-apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', updateApiDetails);
+// === FIN DEL REEMPLAZO ===
+
+if (apiAsteroidSelect) {
+  apiAsteroidSelect.addEventListener('change', function() {
+    updateApiDetails();
+    
+    // También actualizar la selección en el panel principal si es necesario
+    const idx = Number(this.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) {
+      setActiveObjectByIndex(idx, { 
+        updateViewer: true, 
+        updateDetails: false, 
+        updateProbability: false 
+      });
+    }
+  });
+}
 
 function setViewerMode(mode) {
   viewerMode = mode;
@@ -1905,7 +1943,16 @@ function setViewerMode(mode) {
     apiControls.classList.remove('hidden');
     modeToggle.textContent = 'Modo API';
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
+    
+    // Usar el catálogo actual en lugar de datos mock
     populateApiSelect();
+    
+    // Si hay un objeto seleccionado, cargar sus detalles
+    if (Number.isInteger(currentObjectIndex) && filteredCatalog[currentObjectIndex]) {
+      const selectedObject = filteredCatalog[currentObjectIndex];
+      apiAsteroidDetails.value = formatObjectDetails(selectedObject);
+      computeAndDisplayImpactProbability(selectedObject, { source: 'viewer-mode' });
+    }
   }
 }
 
@@ -1980,3 +2027,12 @@ simulateBtn.addEventListener('click', () => {
     } catch (_) {}
   });
 })();
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Inicializar el select del modo API cuando esté disponible
+  if (apiAsteroidSelect && viewerMode === 'api') {
+    setTimeout(() => {
+      populateApiSelect();
+    }, 100);
+  }
+});

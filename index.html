@@ -172,7 +172,6 @@
           </div>
         </div>
 
-        <!-- Controles: Modo API -->
         <div id="apiControls" class="hidden">
           <div class="control-group">
             <label>Fuente de datos</label>
@@ -187,7 +186,10 @@
           </div>
           <div class="control-group">
             <label for="apiAsteroidSelect">Lista de asteroides (catálogo)</label>
-            <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
+            <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+              <option value="">Cargando catálogo...</option>
+            </select>
+            <div class="value small" id="objectSummary">--</div>
           </div>
           <div class="control-group">
             <label for="apiAsteroidDetails">Detalles</label>
