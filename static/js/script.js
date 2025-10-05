@@ -117,7 +117,7 @@ const selectionMap = L.map('selectMap', {
   attributionControl: false,
   zoomControl: false
 }).setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 7 }).addTo(selectionMap);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(selectionMap);
 selectionMap.on('click', (e) => {
   selectedLat = e.latlng.lat;
   selectedLon = e.latlng.lng;
@@ -128,7 +128,7 @@ selectionMap.on('click', (e) => {
 
 // Leaflet: mapa principal
 const map = L.map('map2D').setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13 }).addTo(map);
 
 // Leyenda en el mapa
 const legend = L.control({ position: 'bottomright' });
@@ -2036,3 +2036,201 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 100);
   }
 });
+let craterCircle;
+
+// Parámetros de inicio
+function updateCraterDisplay() {
+    console.log('=== updateCraterDisplay START ===');
+    
+    // Switch to 2D map view
+    document.getElementById('globe3D').classList.add('hidden');
+    document.getElementById('map2D').classList.remove('hidden');
+    
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
+    
+    if (!impactMarker) {
+        alert('Por favor, haz clic en el mapa para seleccionar un punto de impacto');
+        return;
+    }
+    
+    const L_input = parseFloat(diameterInput.value);
+    const v_i = parseFloat(velocityInput.value) * 1000;
+    
+    // Get density from the input field
+    const phi_i = parseFloat(document.getElementById('density').value);
+    const phi_t = 2000;
+    const theta_deg = document.getElementById('theta') ? 
+                      parseFloat(document.getElementById('theta').value) : 45;
+    
+    console.log('Using density from input:', phi_i);
+    
+    console.log('Input values:', { L_input, v_i, phi_i, phi_t, theta_deg });
+    
+    // Calculate crater
+    const craterData = calculateCraterImpact(phi_i, phi_t, L_input, v_i, theta_deg);
+    
+    console.log('Crater data:', craterData);
+    console.log('D_fr:', craterData.D_fr);
+    
+    // Update results panel
+    document.getElementById('craterType').textContent = craterData.craterType;
+    document.getElementById('D_tc').textContent = craterData.D_tc.toFixed(2);
+    document.getElementById('D_fr').textContent = craterData.D_fr.toFixed(2);
+    document.getElementById('d_fr').textContent = craterData.d_fr.toFixed(2);
+    document.getElementById('h_fr').textContent = craterData.h_fr > 0 ? craterData.h_fr.toFixed(2) : 'N/A';
+    
+    // Calculate energy
+    const mass = (4/3) * Math.PI * Math.pow(L_input/2, 3) * phi_i;
+    const energy_joules = 0.5 * mass * Math.pow(v_i, 2);
+    const energy_megatons = energy_joules / (4.184e15);
+    document.getElementById('energy').textContent = energy_megatons.toFixed(2);
+    
+    // Calculate crater radius and display on map
+    const craterRadius = craterData.D_fr / 2;
+    console.log('Crater radius (meters):', craterRadius);
+    console.log('Calling updateMapCrater...');
+    
+    updateMapCrater(craterRadius);
+    console.log('=== updateCraterDisplay END ===');
+}
+
+function updateMapCrater(craterRadius) {
+    console.log('=== updateMapCrater START ===');
+    console.log('Crater radius received:', craterRadius);
+    console.log('impactMarker:', impactMarker);
+    console.log('map object:', map);
+    
+    if (!impactMarker) {
+        console.error('No impact marker!');
+        return;
+    }
+    
+    // Remove old crater circle
+    if (craterCircle) {
+        console.log('Removing old crater circle');
+        map.removeLayer(craterCircle);
+    }
+    
+    const impactCoords = impactMarker.getLatLng();
+    console.log('Impact coordinates:', impactCoords);
+    
+    // Create crater circle
+    console.log('Creating circle with radius:', craterRadius);
+    craterCircle = L.circle(impactCoords, {
+        radius: craterRadius,
+        color: '#8B0000',
+        fillColor: '#8B0000',
+        fillOpacity: 0.5,
+        weight: 2
+    });
+    
+    console.log('Adding circle to map');
+    craterCircle.addTo(map);
+    
+    console.log('Circle added, bounds:', craterCircle.getBounds());
+    
+    // Zoom to crater
+    map.fitBounds(craterCircle.getBounds(), { padding: [50, 50] });
+    
+    console.log('=== updateMapCrater END ===');
+}
+
+function updateLegend(craterRadius) {
+    const legendDiv = document.querySelector('.legend'); // Adjust selector as needed
+    
+    if (!legendDiv) {
+        console.warn('Legend div not found');
+        return;
+    }
+    
+    legendDiv.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;">
+            <span style="width:12px;height:12px;background:rgba(139, 0, 0, 0.6);border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> 
+            Cráter (${(craterRadius/1000).toFixed(2)} km)
+        </div>
+    `;
+}
+
+// Make sure button listener is added AFTER the DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    const simulateBtn = document.getElementById('simulateBtn');
+    console.log('Simulate button:', simulateBtn); // Check if button exists
+    
+    if (simulateBtn) {
+        simulateBtn.addEventListener('click', function() {
+            console.log('Button clicked!');
+            updateCraterDisplay();
+        });
+    } else {
+        console.error('simulateBtn not found!');
+    }
+});
+
+// Dimensiones de cráter
+function calculateCraterImpact(phi_i, phi_t, L, v_i, theta_deg) {
+    const H = 8;
+    const Cd = 2;
+    const phi_0 = 1;
+    const theta = (theta_deg * Math.PI) / 180; // Convert to radians
+   
+    // Impactor yield strength
+    const Yi = Math.pow(10, 6) * Math.pow(10, 2.107 + 0.0624 * Math.sqrt(phi_i));
+   
+    // Strength parameter I (using L, not L0)
+    const I_f = 4.07 * ((Cd * H * Yi) / (phi_i * L * Math.pow(v_i, 2) * Math.sin(theta)));
+   
+    let L_final; // Renamed to avoid confusion
+   
+    if (I_f > 1) {
+        L_final = L;
+    } else {
+        // Breakup altitude
+        const z_o = -H * (Math.log(Yi / (phi_0 * Math.pow(v_i, 2))) + 1.308 - 0.314 * I_f - 1.303 * Math.sqrt(1 - I_f));
+       
+        // Density at breakup altitude
+        const phi_zo = phi_0 * Math.exp(-z_o / H);
+       
+        // Dispersion length (using L, not L0)
+        const l = L * Math.sin(theta) * Math.sqrt(phi_i / (Cd * phi_zo));
+       
+        // Final diameter (using L, not L0)
+        L_final = L * Math.sqrt(1 + Math.pow((2 * H / l), 2) * Math.pow((Math.exp((z_o - 0) / (2 * H)) - 1), 2));
+    }
+    
+    const g_E = 9.81;
+    // Transient crater calculations (using L_final, not L)
+    const D_tc = 1.161 * Math.pow(phi_i / phi_t, 1 / 3) * Math.pow(L_final, 0.78) *
+                 Math.pow(v_i, 0.44) * Math.pow(g_E, -0.22) *
+                 Math.pow(Math.sin(theta), 1 / 3);
+   
+    const d_tc = D_tc / (2 * Math.sqrt(2));
+    const V_tc = (Math.PI * Math.pow(D_tc, 3)) / (16 * Math.sqrt(2)) * 1e-9;
+    
+    let craterType, D_fr, d_fr, h_fr;
+    
+    if (D_tc <= 2560) {
+        craterType = 'Cráter simple';
+        D_fr = 1.25 * D_tc;
+        const V_br = 0.032 * Math.pow(D_fr, 3);
+        d_fr = 0.294 * Math.pow(D_fr, 0.301) * 100;
+        h_fr = 0.07 * (Math.pow(D_tc, 4) / Math.pow(D_fr, 3));
+    } else {
+        craterType = 'Cráter complejo';
+        const D_c = 3200;
+        D_fr = 1.17 * Math.pow(D_tc, 1.13) / Math.pow(D_c, 0.13);
+        d_fr = 0.4 * Math.pow(D_fr, 0.3);
+        h_fr = 0;
+    }
+    
+    return {
+        craterType,
+        D_tc,
+        d_tc,
+        V_tc,
+        D_fr,
+        d_fr,
+        h_fr
+    };
+}
