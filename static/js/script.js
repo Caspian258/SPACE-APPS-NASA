@@ -141,7 +141,7 @@ show2D.addEventListener('click', () => { map2D.classList.remove('hidden'); globe
 // Three.js (UMD) expone window.THREE cuando se carga desde <script>
 const THREE_NS = window.THREE;
 let renderer, scene, camera, earthMesh, asteroidMesh, trajectoryLine, starSphere, moonMesh, sunLight, earthGroup;
-let isDragging = false;
+let isDragging = false; 
 
 function initThree() {
   if (!THREE_NS) {
