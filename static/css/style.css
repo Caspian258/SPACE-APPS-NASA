@@ -52,10 +52,18 @@ input[type="number"] { width: 100%; padding: 8px; background: #0b1526; border: 1
 
 footer { padding: 10px 16px; border-top: 1px solid #25324a; background: #0f1a2b; color: #9fb0c7; }
 
-/* Footer icon button */
-footer { position: relative; }
-.footer-icon-button { position: absolute; right: 14px; bottom: 10px; background: transparent; border: none; padding: 0; cursor: pointer; }
-.footer-icon-button img { width: 28px; height: 28px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+/* Footer icon button - Fixed position in bottom right corner */
+.footer-icon-button { 
+  position: fixed; 
+  right: 20px; 
+  bottom: 20px; 
+  background: transparent; 
+  border: none; 
+  padding: 0; 
+  cursor: pointer; 
+  z-index: 999;
+}
+.footer-icon-button img { width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 
 /* ============================================= */
 /* == MODO AMIGABLE PARA DALTÓNICOS (ALTO CONTRASTE) == */
@@ -148,3 +156,324 @@ body.colorblind-mode .tooltip .tooltiptext {
 .viewer-right { background: #0b1220; border: 1px solid #22304a; border-radius: 8px; overflow: hidden; }
 .toggle { width: 100%; padding: 8px; background: #18263f; color: #e8eef5; border: 1px solid #22304a; border-radius: 6px; cursor: pointer; }
 .toggle:hover { background: #1a2b48; }
+
+/* Menú de Accesibilidad - Estilo Burbuja */
+.accessibility-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.accessibility-menu__list {
+  position: fixed;
+  bottom: 65px;
+  right: 20px;
+  background: #1c2a45;
+  border: 1px solid #2a3b62;
+  border-radius: 12px;
+  padding: 8px 0;
+  margin: 0;
+  list-style: none;
+  min-width: 200px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.accessibility-menu__list.hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+/* Flecha de la burbuja */
+.accessibility-menu__list::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #1c2a45;
+}
+
+.accessibility-menu__list::before {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  right: 19px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid #2a3b62;
+}
+
+.accessibility-menu__list li {
+  margin: 0;
+  padding: 0;
+}
+
+.accessibility-menu__list button {
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  color: #e8eef5;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.15s ease;
+}
+
+.accessibility-menu__list button:hover {
+  background: #2a3b62;
+}
+
+.accessibility-menu__languages {
+  border-top: 1px solid #2a3b62;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.menu-group-label {
+  display: block;
+  padding: 8px 16px 4px;
+  font-size: 0.8rem;
+  color: #a9b6c7;
+  font-weight: 600;
+}
+
+.language-options {
+  display: flex;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.lang-option {
+  flex: 1;
+  padding: 6px 8px !important;
+  background: #0b1526 !important;
+  border: 1px solid #22304a !important;
+  border-radius: 6px !important;
+  font-size: 0.8rem !important;
+  text-align: center !important;
+}
+
+.lang-option:hover {
+  background: #18263f !important;
+}
+
+.lang-option.active {
+  background: #2a7de1 !important;
+  border-color: #2a7de1 !important;
+  color: #fff !important;
+}
+
+/* Modo daltónico para el menú */
+body.colorblind-mode .accessibility-menu__list {
+  background: #32302f;
+  border-color: #665c54;
+}
+
+body.colorblind-mode .accessibility-menu__list::after {
+  border-top-color: #32302f;
+}
+
+body.colorblind-mode .accessibility-menu__list::before {
+  border-top-color: #665c54;
+}
+
+body.colorblind-mode .accessibility-menu__list button {
+  color: #fbf1c7;
+}
+
+body.colorblind-mode .accessibility-menu__list button:hover {
+  background: #458588;
+}
+
+body.colorblind-mode .accessibility-menu__languages {
+  border-top-color: #665c54;
+}
+
+body.colorblind-mode .menu-group-label {
+  color: #d5c4a1;
+}
+
+body.colorblind-mode .lang-option {
+  background: #1d2021 !important;
+  border-color: #665c54 !important;
+  color: #fbf1c7 !important;
+}
+
+body.colorblind-mode .lang-option:hover {
+  background: #458588 !important;
+}
+
+body.colorblind-mode .lang-option.active {
+  background: #fe8019 !important;
+  border-color: #fe8019 !important;
+  color: #1d2021 !important;
+}
+
+/* FAQ Modal - Estilo Burbuja */
+.faq-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.faq-modal.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.faq-modal__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.faq-modal__dialog {
+  position: relative;
+  background: #1c2a45;
+  border: 1px solid #2a3b62;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px;
+  max-width: 500px;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  transform: scale(1);
+  transition: transform 0.3s ease;
+}
+
+.faq-modal.hidden .faq-modal__dialog {
+  transform: scale(0.9);
+}
+
+.faq-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: #a9b6c7;
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.faq-modal__close:hover {
+  background: #2a3b62;
+  color: #e8eef5;
+}
+
+.faq-modal h2 {
+  margin: 0 0 20px 0;
+  color: #e8eef5;
+  font-size: 1.4rem;
+  padding-right: 40px;
+}
+
+.faq-modal__body {
+  color: #e8eef5;
+}
+
+.faq-modal__body details {
+  margin-bottom: 16px;
+  border: 1px solid #2a3b62;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.faq-modal__body summary {
+  padding: 12px 16px;
+  background: #0b1526;
+  cursor: pointer;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.15s ease;
+}
+
+.faq-modal__body summary:hover {
+  background: #18263f;
+}
+
+.faq-modal__body details[open] summary {
+  border-bottom-color: #2a3b62;
+}
+
+.faq-modal__body details p {
+  padding: 16px;
+  margin: 0;
+  background: #1c2a45;
+  color: #b9c4d2;
+  line-height: 1.5;
+}
+
+/* Modo daltónico para el FAQ */
+body.colorblind-mode .faq-modal__dialog {
+  background: #32302f;
+  border-color: #665c54;
+}
+
+body.colorblind-mode .faq-modal__close {
+  color: #d5c4a1;
+}
+
+body.colorblind-mode .faq-modal__close:hover {
+  background: #458588;
+  color: #fbf1c7;
+}
+
+body.colorblind-mode .faq-modal h2 {
+  color: #fbf1c7;
+}
+
+body.colorblind-mode .faq-modal__body {
+  color: #fbf1c7;
+}
+
+body.colorblind-mode .faq-modal__body details {
+  border-color: #665c54;
+}
+
+body.colorblind-mode .faq-modal__body summary {
+  background: #1d2021;
+}
+
+body.colorblind-mode .faq-modal__body summary:hover {
+  background: #458588;
+}
+
+body.colorblind-mode .faq-modal__body details[open] summary {
+  border-bottom-color: #665c54;
+}
+
+body.colorblind-mode .faq-modal__body details p {
+  background: #32302f;
+  color: #d5c4a1;
+}
