@@ -10,8 +10,8 @@
 </head>
 <body>
   <header>
-    <h1>Asteroid Impact Simulator</h1>
-    <p>Explora el impacto de asteroides y estrategias de mitigación.</p>
+    <h1 data-i18n="title">Asteroid Impact Simulator</h1>
+    <p data-i18n="subtitle">Explora el impacto de asteroides y estrategias de mitigación.</p>
     <!-- Botón (imagen) para abrir el Visor de Asteroides -->
     <button id="openAsteroidViewerBtn" class="icon-button" title="Abrir visor de asteroides">
       <img src="./static/img/asteroid-icon.png" alt="Abrir visor de asteroides" />
@@ -21,88 +21,89 @@
   <main id="simLayout" class="layout">
     <!-- Control Panel -->
     <section class="panel control">
-      <h2>Panel de Control</h2>
+      <h2 data-i18n="controlPanelHeading">Panel de Control</h2>
       <div class="control-group">
-        <label for="diameter">Diámetro del Asteroide (m)</label>
+        <label for="diameter"><span data-i18n="label.diameter">Diámetro del Asteroide (m)</span></label>
         <input type="range" id="diameter" min="10" max="1000" step="1" value="100" />
         <div class="value" id="diameterValue">100 m</div>
       </div>
       <div class="control-group">
-        <label for="velocity">Velocidad del Asteroide (km/s)</label>
+        <label for="velocity"><span data-i18n="label.velocity">Velocidad del Asteroide (km/s)</span></label>
         <input type="range" id="velocity" min="10" max="70" step="0.1" value="20" />
         <div class="value" id="velocityValue">20.0 km/s</div>
       </div>
       <div class="control-group">
-        <label for="density">Densidad (kg/m³)</label>
+        <label for="density"><span data-i18n="label.density">Densidad (kg/m³)</span></label>
         <input type="number" id="density" min="500" max="8000" step="100" value="3000" />
       </div>
 
       <div class="control-group">
-        <label>Selecciona el punto de impacto</label>
+        <label><span data-i18n="label.selectImpact">Selecciona el punto de impacto</span></label>
         <div id="selectMap" class="map-select"></div>
         <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
       </div>
 
       <div class="control-group">
-        <label for="mitigation" class="tooltip">Velocidad de Deflexión (km/s)
-          <span class="tooltiptext">Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.</span>
+        <label for="mitigation" class="tooltip">
+          <span data-i18n="label.mitigation">Velocidad de Deflexión (km/s)</span>
+          <span class="tooltiptext" data-i18n="tooltip.mitigation">Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.</span>
         </label>
         <input type="range" id="mitigation" min="0" max="0.1" step="0.001" value="0" />
         <div class="value" id="mitigationValue">0.000 km/s</div>
       </div>
 
-      <button id="simulateBtn" class="simulate">¡Simular Impacto!</button>
+  <button id="simulateBtn" class="simulate" data-i18n="button.simulate">¡Simular Impacto!</button>
 
 
       <div class="toggle-views">
-        <button id="show3D">Ver Globo 3D</button>
-        <button id="show2D">Ver Mapa 2D</button>
+        <button id="show3D" data-i18n="button.view3D">Ver Globo 3D</button>
+        <button id="show2D" data-i18n="button.view2D">Ver Mapa 2D</button>
       </div>
 
       <div class="control-group" style="margin-top:12px;">
-        <label>Catálogo de objetos</label>
+        <label><span data-i18n="label.catalogHeading">Catálogo de objetos</span></label>
         <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="asteroids" checked /> Asteroides
+            <input type="radio" name="datasetMain" value="asteroids" checked /> <span data-i18n="radio.asteroids">Asteroides</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="comets" /> Cometas
+            <input type="radio" name="datasetMain" value="comets" /> <span data-i18n="radio.comets">Cometas</span>
           </label>
         </div>
       </div>
 
       <div class="control-group">
-        <label for="objectSelect">Seleccionar objeto</label>
+        <label for="objectSelect"><span data-i18n="label.selectObject">Seleccionar objeto</span></label>
         <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-          <option value="">Cargando catálogo...</option>
+          <option value="" data-i18n="option.loadingCatalog">Cargando catálogo...</option>
         </select>
         <div class="value small" id="objectSummary">--</div>
       </div>
 
       <div class="control-group" style="margin-top:12px;">
-        <label for="filterName">Buscar por nombre</label>
-        <input type="text" id="filterName" placeholder="Ej: Apophis" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+        <label for="filterName"><span data-i18n="label.filterName">Buscar por nombre</span></label>
+        <input type="text" id="filterName" placeholder="Ej: Apophis" data-i18n-placeholder="placeholder.filterName" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
       </div>
 
       <div class="control-group" style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
-          <label for="filterMinDiameter">Diámetro mínimo (km)</label>
-          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          <label for="filterMinDiameter"><span data-i18n="label.filterMinDiameter">Diámetro mínimo (km)</span></label>
+          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
         <div>
-          <label for="filterMinVelocity">Velocidad mínima (km/s)</label>
-          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          <label for="filterMinVelocity"><span data-i18n="label.filterMinVelocity">Velocidad mínima (km/s)</span></label>
+          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" data-i18n-placeholder="placeholder.numeric" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
       </div>
 
       <div class="control-group" style="margin-top:6px;">
-        <label>Rango de fechas de descubrimiento</label>
+        <label><span data-i18n="label.discoveryRange">Rango de fechas de descubrimiento</span></label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <input type="date" id="filterDateStart" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
           <input type="date" id="filterDateEnd" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
       </div>
-      <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;">Calcular Probabilidad de Impacto</button>
+      <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;" data-i18n="button.calculateProbability">Calcular Probabilidad de Impacto</button>
     </section>
 
     <!-- Visualization -->
@@ -113,25 +114,25 @@
 
     <!-- Results Panel -->
     <section class="panel results">
-      <h2>Resultados</h2>
+      <h2 data-i18n="resultsHeading">Resultados</h2>
       <ul class="results-list">
-        <li><strong>Energía de Impacto:</strong> <span id="energy">--</span> Megatones</li>
-        <li><strong>Tipo de cráter:</strong> <span class="value" id="craterType">--</span></li>
-        <li><strong>Diámetro inicial:</strong> <span class="value" id="D_tc">--</span> m</li>
-        <li><strong>Diámetro final:</strong> <span class="value" id="D_fr">--</span> m</li>
-        <li><strong>Profundidad final:</strong> <span class="value" id="d_fr">--</span> m</li>
-        <li><strong>Altura de cresta:</strong> <span class="value" id="h_fr">--</span> m</li>
-        <li><strong>Probabilidad de Impacto por Órbita (debug):</strong> <span id="probability-result">--</span></li>
+        <li><strong data-i18n="results.energy">Energía de Impacto:</strong> <span id="energy">--</span> <span data-i18n="units.megatons">Megatones</span></li>
+        <li><strong data-i18n="results.craterType">Tipo de cráter:</strong> <span class="value" id="craterType">--</span></li>
+        <li><strong data-i18n="results.initialDiameter">Diámetro inicial:</strong> <span class="value" id="D_tc">--</span> <span data-i18n="units.meters">m</span></li>
+        <li><strong data-i18n="results.finalDiameter">Diámetro final:</strong> <span class="value" id="D_fr">--</span> <span data-i18n="units.meters">m</span></li>
+        <li><strong data-i18n="results.finalDepth">Profundidad final:</strong> <span class="value" id="d_fr">--</span> <span data-i18n="units.meters">m</span></li>
+        <li><strong data-i18n="results.rimHeight">Altura de cresta:</strong> <span class="value" id="h_fr">--</span> <span data-i18n="units.meters">m</span></li>
+        <li><strong data-i18n="results.probability">Probabilidad de Impacto por Órbita (debug):</strong> <span id="probability-result">--</span></li>
       </ul>
 
       <div class="neo-picker hidden" id="neoPicker">
-        <h3>Selecciona un NEO</h3>
-        <div class="value small">Fuente: NASA NeoWs (demo)</div>
+        <h3 data-i18n="neo.heading">Selecciona un NEO</h3>
+        <div class="value small" data-i18n="neo.source">Fuente: NASA NeoWs (demo)</div>
         <select id="neoSelect" style="width:100%;margin:8px 0;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
         <div class="value small" id="neoDetails">--</div>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="applyNeo" class="simulate" style="flex:1;background:#2a7de1">Aplicar</button>
-          <button id="closeNeo" class="simulate" style="flex:1;background:#444e5f">Cerrar</button>
+          <button id="applyNeo" class="simulate" style="flex:1;background:#2a7de1" data-i18n="button.apply">Aplicar</button>
+          <button id="closeNeo" class="simulate" style="flex:1;background:#444e5f" data-i18n="button.close">Cerrar</button>
         </div>
       </div>
     </section>
@@ -140,36 +141,36 @@
   <!-- Visor de Asteroides (oculto por defecto) -->
   <div id="asteroidViewer" class="viewer hidden">
     <div class="viewer-header">
-      <h2>Visor de Asteroides</h2>
+      <h2 data-i18n="viewer.heading">Visor de Asteroides</h2>
     </div>
     <div class="viewer-grid">
       <!-- Columna Izquierda: Controles e Información -->
       <div class="viewer-left">
         <div class="control-group" style="margin-top:0;">
-          <label for="modeToggle">Modo</label>
-          <button id="modeToggle" class="toggle">Modo Manual</button>
-          <div class="value small">Pulsa para alternar entre Manual y API</div>
+          <label for="modeToggle"><span data-i18n="viewer.modeLabel">Modo</span></label>
+          <button id="modeToggle" class="toggle" data-i18n="viewer.modeManual">Modo Manual</button>
+          <div class="value small" data-i18n="viewer.modeHint">Pulsa para alternar entre Manual y API</div>
         </div>
 
         <!-- Controles: Modo Manual -->
         <div id="manualControls">
           <div class="control-group">
-            <label for="manDiameter">Diámetro (km)</label>
+            <label for="manDiameter"><span data-i18n="viewer.manual.diameter">Diámetro (km)</span></label>
             <input type="range" id="manDiameter" min="0.1" max="1000" step="0.1" value="50" />
             <div class="value" id="manDiameterValue">50.0 km</div>
           </div>
           <div class="control-group">
-            <label for="manSpeed">Velocidad (unid.)</label>
+            <label for="manSpeed"><span data-i18n="viewer.manual.speed">Velocidad (unid.)</span></label>
             <input type="range" id="manSpeed" min="0" max="60" step="0.1" value="10" />
             <div class="value" id="manSpeedValue">10.0</div>
           </div>
           <div class="control-group">
-            <label for="manDensity">Densidad (kg/m³)</label>
+            <label for="manDensity"><span data-i18n="viewer.manual.density">Densidad (kg/m³)</span></label>
             <input type="range" id="manDensity" min="500" max="8000" step="100" value="3000" />
             <div class="value" id="manDensityValue">3000 kg/m³</div>
           </div>
           <div class="control-group">
-            <label for="manRotation">Rotación (°/s)</label>
+            <label for="manRotation"><span data-i18n="viewer.manual.rotation">Rotación (°/s)</span></label>
             <input type="range" id="manRotation" min="0" max="30" step="0.1" value="5" />
             <div class="value" id="manRotationValue">5.0 °/s</div>
           </div>
@@ -177,25 +178,25 @@
 
         <div id="apiControls" class="hidden">
           <div class="control-group">
-            <label>Fuente de datos</label>
+            <label><span data-i18n="viewer.api.sourceLabel">Fuente de datos</span></label>
             <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
               <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="asteroids" checked /> Asteroides
+                <input type="radio" name="datasetViewer" value="asteroids" checked /> <span data-i18n="radio.asteroids">Asteroides</span>
               </label>
               <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="comets" /> Cometas
+                <input type="radio" name="datasetViewer" value="comets" /> <span data-i18n="radio.comets">Cometas</span>
               </label>
             </div>
           </div>
           <div class="control-group">
-            <label for="apiAsteroidSelect">Lista de asteroides (catálogo)</label>
+            <label for="apiAsteroidSelect"><span data-i18n="viewer.api.listLabel">Lista de asteroides (catálogo)</span></label>
             <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-              <option value="">Cargando catálogo...</option>
+              <option value="" data-i18n="option.loadingCatalog">Cargando catálogo...</option>
             </select>
             <div class="value small" id="objectSummary">--</div>
           </div>
           <div class="control-group">
-            <label for="apiAsteroidDetails">Detalles</label>
+            <label for="apiAsteroidDetails"><span data-i18n="viewer.api.detailsLabel">Detalles</span></label>
             <textarea id="apiAsteroidDetails" rows="6" readonly style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;resize:vertical;"></textarea>
           </div>
         </div>
@@ -209,12 +210,51 @@
   </div>
 
   <footer>
-    <small>Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
-    <!-- Botón para modo amigable para daltónicos -->
-    <button id="color-toggle-btn" class="footer-icon-button" title="Modo daltónico">
-      <img src="./static/img/accessibility-icon.png" alt="Accesibilidad" />
-    </button>
+    <small data-i18n="footer.disclaimer">Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
+    <div class="accessibility-menu">
+      <button id="accessibilityMenuButton" class="footer-icon-button" aria-haspopup="true" aria-expanded="false" aria-controls="accessibilityMenu" title="Accesibilidad y ayuda">
+        <img src="./static/img/accessibility-icon.png" alt="Accesibilidad" />
+        <span class="sr-only" data-i18n="menu.accessibility">Accesibilidad y ayuda</span>
+      </button>
+      <ul id="accessibilityMenu" class="accessibility-menu__list hidden" role="menu">
+        <li role="none">
+          <button id="color-toggle-btn" type="button" role="menuitem" data-i18n="menu.colorToggle">Modo daltónico</button>
+        </li>
+        <li role="none">
+          <button id="faq-open-btn" type="button" role="menuitem" data-i18n="menu.faq">Preguntas frecuentes</button>
+        </li>
+        <li role="none" class="accessibility-menu__languages">
+          <span class="menu-group-label" data-i18n="menu.languageLabel">Idioma</span>
+          <div class="language-options" role="group" aria-label="Idioma">
+            <button type="button" class="lang-option active" data-lang-option="es" data-i18n="menu.lang.es">Español</button>
+            <button type="button" class="lang-option" data-lang-option="en" data-i18n="menu.lang.en">English</button>
+          </div>
+        </li>
+      </ul>
+    </div>
   </footer> 
+
+  <div id="faqModal" class="faq-modal hidden" role="dialog" aria-modal="true" aria-labelledby="faqModalTitle">
+    <div class="faq-modal__overlay" id="faqOverlay"></div>
+    <div class="faq-modal__dialog">
+  <button type="button" class="faq-modal__close" id="faqCloseBtn" aria-label="Cerrar" data-i18n-aria-label="faq.closeAria">×</button>
+      <h2 id="faqModalTitle" data-i18n="faq.title">Preguntas frecuentes</h2>
+      <div class="faq-modal__body">
+        <details open>
+          <summary data-i18n="faq.q1">¿Cómo selecciono un punto de impacto?</summary>
+          <p data-i18n="faq.a1">Usa el mapa de selección en el panel izquierdo y haz clic en la ubicación deseada. El marcador mostrará las coordenadas exactas.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.q2">¿Qué significa el modo daltónico?</summary>
+          <p data-i18n="faq.a2">Activa una paleta de alto contraste pensada para usuarios con daltonismo y condiciones de baja visibilidad.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.q3">¿Cómo cambio entre asteroides y cometas?</summary>
+          <p data-i18n="faq.a3">Utiliza los botones de radio en el catálogo o en el visor 3D para alternar entre los conjuntos de datos disponibles.</p>
+        </details>
+      </div>
+    </div>
+  </div>
 
   <!-- Leaflet JS (CDN) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
