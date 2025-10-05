@@ -1,6 +1,7 @@
-# 🌍 **Asteroid Impact Simulator**
+# 🌍 **Asteroid Impact Simulator** 
 
-**Asteroid Impact Simulator** es un simulador interactivo que permite visualizar los efectos del impacto de un asteroide en el planeta Tierra. El proyecto permite que los usuarios puedan experimentar con variables ya sea el tamaño, velocidad, densidad y punto de impacto de un asteroide, así como probar medidads de deflexión de impacto de un asteroide, así como probar medidas de deflexión inspiradas en técnicas reales de mitigación. Fue desarrollado como un prototipo frontend standalone, lo que significa que funciona directamente en un navegador sin necesidad de un servidor backend.
+
+Inspirado en la defensa planetaria y la exploración espacial, **Asteroid Impact Simulator** es un simulador interactivo que permite visualizar los efectos del impacto de un asteroide en el planeta Tierra. El proyecto permite que los usuarios puedan experimentar con variables ya sea el tamaño, velocidad, densidad y punto de impacto de un asteroide, así como probar medidads de deflexión de impacto de un asteroide, así como probar medidas de deflexión inspiradas en técnicas reales de mitigación. Fue desarrollado como un prototipo frontend standalone, lo que significa que funciona directamente en un navegador sin necesidad de un servidor backend.
 
 ---
 
