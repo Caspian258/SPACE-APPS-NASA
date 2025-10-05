@@ -1962,6 +1962,8 @@ simulateBtn.addEventListener('click', () => {
   drawEffectZones(data.impactLat, data.impactLon, data.craterDiameterKM, data.effectZones);
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
+  map.removeControl(legend2);
+  legend2.addTo(map);
 });
 
 // Accesibilidad: botón de modo daltónico (toggle en <body>)
