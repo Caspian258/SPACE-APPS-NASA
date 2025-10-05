@@ -36,6 +36,209 @@ const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
 const probabilityDebugOut = document.getElementById('probability-result');
 const calculateProbBtn = document.getElementById('calculate-prob-btn');
+const menuToggleBtn = document.getElementById('menu-toggle-btn');
+const optionsMenu = document.getElementById('options-menu');
+const eduBtn = document.getElementById('edu-btn');
+const faqBtn = document.getElementById('faq-btn');
+const langEsBtn = document.getElementById('lang-es-btn');
+const langEnBtn = document.getElementById('lang-en-btn');
+const colorblindBtn = document.getElementById('colorblind-btn');
+const faqModal = document.getElementById('faq-modal');
+const faqCloseBtn = document.getElementById('faq-close-btn');
+
+let currentLanguage = 'es';
+try {
+  const savedLang = localStorage.getItem('preferred-language');
+  if (savedLang === 'en' || savedLang === 'es') {
+    currentLanguage = savedLang;
+  }
+} catch (_) {}
+
+function translate(es, en = es) {
+  if (currentLanguage === 'en' && typeof en === 'string') return en;
+  return es;
+}
+
+function updateModeToggleLabel() {
+  if (!modeToggle) return;
+  const attr = viewerMode === 'manual' ? `data-label-manual-${currentLanguage}` : `data-label-api-${currentLanguage}`;
+  const fallback = viewerMode === 'manual' ? 'data-label-manual-es' : 'data-label-api-es';
+  const label = modeToggle.getAttribute(attr) || modeToggle.getAttribute(fallback) || modeToggle.textContent;
+  modeToggle.textContent = label;
+}
+
+function refreshDynamicTranslations() {
+  updateModeToggleLabel();
+  updateObjectSummary(getCurrentSelectedItem());
+  if (typeof updateApiDetails === 'function') {
+    updateApiDetails();
+  }
+}
+
+function setLanguage(lang) {
+  const normalized = lang === 'en' ? 'en' : 'es';
+  currentLanguage = normalized;
+  document.documentElement.setAttribute('lang', normalized);
+
+  document.querySelectorAll('[data-lang-es]').forEach((element) => {
+    const translation = element.getAttribute(`data-lang-${normalized}`);
+    if (translation !== null) {
+      element.textContent = translation;
+    }
+  });
+
+  document.querySelectorAll('[data-placeholder-es]').forEach((element) => {
+    const translation = element.getAttribute(`data-placeholder-${normalized}`);
+    if (translation !== null) {
+      element.setAttribute('placeholder', translation);
+    }
+  });
+
+  document.querySelectorAll('[data-title-es]').forEach((element) => {
+    const translation = element.getAttribute(`data-title-${normalized}`);
+    if (translation !== null) {
+      element.setAttribute('title', translation);
+    }
+  });
+
+  document.querySelectorAll('[data-alt-es]').forEach((element) => {
+    const translation = element.getAttribute(`data-alt-${normalized}`);
+    if (translation !== null) {
+      element.setAttribute('alt', translation);
+    }
+  });
+
+  refreshDynamicTranslations();
+
+  try {
+    localStorage.setItem('preferred-language', normalized);
+  } catch (_) {}
+}
+
+function hideOptionsMenu() {
+  if (!optionsMenu) return;
+  optionsMenu.classList.add('hidden');
+  optionsMenu.setAttribute('aria-hidden', 'true');
+  if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function showOptionsMenu() {
+  if (!optionsMenu) return;
+  optionsMenu.classList.remove('hidden');
+  optionsMenu.setAttribute('aria-hidden', 'false');
+  if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'true');
+}
+
+function toggleOptionsMenu() {
+  if (!optionsMenu) return;
+  if (optionsMenu.classList.contains('hidden')) showOptionsMenu(); else hideOptionsMenu();
+}
+
+function openFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.remove('hidden');
+  faqModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+
+function closeFaqModal() {
+  if (!faqModal) return;
+  faqModal.classList.add('hidden');
+  faqModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+}
+
+if (optionsMenu) {
+  hideOptionsMenu();
+}
+
+if (menuToggleBtn) {
+  menuToggleBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleOptionsMenu();
+  });
+}
+
+if (optionsMenu) {
+  optionsMenu.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!link) return;
+    event.preventDefault();
+
+    if (link === eduBtn) {
+      console.log(translate('Educación clickeado', 'Education clicked'));
+      hideOptionsMenu();
+      return;
+    }
+
+    if (link === faqBtn) {
+      openFaqModal();
+      hideOptionsMenu();
+      return;
+    }
+
+    if (link === langEsBtn) {
+      setLanguage('es');
+      hideOptionsMenu();
+      return;
+    }
+
+    if (link === langEnBtn) {
+      setLanguage('en');
+      hideOptionsMenu();
+      return;
+    }
+
+    if (link === colorblindBtn) {
+      document.body.classList.toggle('colorblind-mode');
+      try {
+        localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
+      } catch (_) {}
+      hideOptionsMenu();
+    }
+  });
+}
+
+document.addEventListener('click', (event) => {
+  if (!optionsMenu || optionsMenu.classList.contains('hidden')) return;
+  if (menuToggleBtn && (event.target === menuToggleBtn || menuToggleBtn.contains(event.target))) return;
+  if (optionsMenu.contains(event.target)) return;
+  hideOptionsMenu();
+});
+
+if (faqCloseBtn) {
+  faqCloseBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeFaqModal();
+  });
+}
+
+if (faqModal) {
+  faqModal.addEventListener('click', (event) => {
+    if (event.target === faqModal) {
+      closeFaqModal();
+    }
+  });
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    if (faqModal && !faqModal.classList.contains('hidden')) {
+      closeFaqModal();
+    } else if (optionsMenu && !optionsMenu.classList.contains('hidden')) {
+      hideOptionsMenu();
+    }
+  }
+});
+
+let colorblindPreferred = false;
+try {
+  colorblindPreferred = localStorage.getItem('colorblind-mode') === '1';
+} catch (_) {}
+if (colorblindPreferred) {
+  document.body.classList.add('colorblind-mode');
+}
 
 
 
@@ -91,6 +294,9 @@ const asteroidCanvas = document.getElementById('asteroidCanvas');
 
 
 
+
+
+
 // Mostrar valores de sliders
 function updateSliderDisplays() {
   diameterValue.textContent = `${diameterInput.value} m`;
@@ -136,11 +342,38 @@ legend.onAdd = function() {
   div.style.padding = '8px';
   div.style.color = '#e8eef5';
   div.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:12px;height:12px;background:${zoneColors.crater};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Cráter</div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:12px;height:12px;background:${zoneColors.total};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Destrucción Total</div>
-    <div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:${zoneColors.severe};border:1px solid rgba(255,255,255,0.25);display:inline-block;"></span> Daños Severos</div>
-  `;
+  const legendItems = [
+    { color: zoneColors.crater, labelEs: 'Cráter', labelEn: 'Crater' },
+    { color: zoneColors.total, labelEs: 'Destrucción Total', labelEn: 'Total Destruction' },
+    { color: zoneColors.severe, labelEs: 'Daños Severos', labelEn: 'Severe Damage' }
+  ];
+
+  legendItems.forEach((item, index) => {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '6px';
+    if (index < legendItems.length - 1) {
+      row.style.marginBottom = '4px';
+    }
+
+    const swatch = document.createElement('span');
+    swatch.style.width = '12px';
+    swatch.style.height = '12px';
+    swatch.style.background = item.color;
+    swatch.style.border = '1px solid rgba(255,255,255,0.25)';
+    swatch.style.display = 'inline-block';
+
+    const label = document.createElement('span');
+    label.dataset.langEs = item.labelEs;
+    label.dataset.langEn = item.labelEn;
+    label.textContent = translate(item.labelEs, item.labelEn);
+
+    row.appendChild(swatch);
+    row.appendChild(label);
+    div.appendChild(row);
+  });
+
   return div;
 };
 legend.addTo(map);
@@ -1053,12 +1286,16 @@ function normalizeCometRecord(record, index = 0) {
   };
 }
 
-function setSelectLoading(selectEl, message) {
+function setSelectLoading(selectEl, messages) {
   if (!selectEl) return;
+  const messageEs = typeof messages === 'string' ? messages : (messages && messages.es) || '';
+  const messageEn = typeof messages === 'string' ? messages : (messages && messages.en) || messageEs;
   selectEl.innerHTML = '';
   const option = document.createElement('option');
   option.value = '';
-  option.textContent = message;
+  option.dataset.langEs = messageEs;
+  option.dataset.langEn = messageEn;
+  option.textContent = translate(messageEs, messageEn);
   selectEl.appendChild(option);
   selectEl.disabled = true;
 }
@@ -1078,11 +1315,14 @@ function updateObjectSummary(objectData) {
     objectSummary.textContent = '--';
     return;
   }
-  const typeLabel = objectData.type === 'comet' ? 'Cometa' : 'Asteroide';
-  const diameter = Number.isFinite(objectData.diameterKm) ? `${objectData.diameterKm.toFixed(1)} km` : 'N/D';
-  const eccentricity = Number.isFinite(objectData.e) ? objectData.e.toFixed(3) : 'N/D';
-  const semiMajor = Number.isFinite(objectData.a) ? `${objectData.a.toFixed(3)} UA` : 'N/D';
-  objectSummary.textContent = `${typeLabel} • Diámetro: ${diameter} • a: ${semiMajor} • e: ${eccentricity}`;
+  const typeLabel = objectData.type === 'comet' ? translate('Cometa', 'Comet') : translate('Asteroide', 'Asteroid');
+  const diameter = Number.isFinite(objectData.diameterKm) ? `${objectData.diameterKm.toFixed(1)} km` : translate('N/D', 'N/A');
+  const eccentricity = Number.isFinite(objectData.e) ? objectData.e.toFixed(3) : translate('N/D', 'N/A');
+  const semiMajor = Number.isFinite(objectData.a) ? `${objectData.a.toFixed(3)} UA` : translate('N/D', 'N/A');
+  const diameterLabel = translate('Diámetro', 'Diameter');
+  const semiMajorLabel = translate('a', 'a');
+  const eccentricityLabel = translate('e', 'e');
+  objectSummary.textContent = `${typeLabel} • ${diameterLabel}: ${diameter} • ${semiMajorLabel}: ${semiMajor} • ${eccentricityLabel}: ${eccentricity}`;
 }
 
 function populateObjectSelect() {
@@ -1090,7 +1330,7 @@ function populateObjectSelect() {
   suppressDatasetEvents = true;
   objectSelect.innerHTML = '';
   if (!filteredCatalog.length) {
-    setSelectLoading(objectSelect, 'Sin datos disponibles');
+    setSelectLoading(objectSelect, { es: 'Sin datos disponibles', en: 'No data available' });
     suppressDatasetEvents = false;
     return;
   }
@@ -1107,21 +1347,21 @@ function populateObjectSelect() {
 function formatObjectDetails(objectData) {
   if (!objectData) return '';
   const lines = [];
-  lines.push(`Nombre: ${objectData.name}`);
-  lines.push(`Tipo: ${objectData.type === 'comet' ? 'Cometa' : 'Asteroide'}`);
-  if (Number.isFinite(objectData.diameterKm)) lines.push(`Diámetro estimado: ${objectData.diameterKm.toFixed(2)} km`);
-  if (Number.isFinite(objectData.density)) lines.push(`Densidad modelo: ${Math.round(objectData.density)} kg/m³`);
-  if (Number.isFinite(objectData.rotation_period)) lines.push(`Periodo de rotación aprox.: ${objectData.rotation_period.toFixed(1)} h`);
-  if (Number.isFinite(objectData.velocity)) lines.push(`Velocidad estimada: ${objectData.velocity.toFixed(1)} km/s`);
-  if (Number.isFinite(objectData.a)) lines.push(`Semieje mayor (a): ${objectData.a.toFixed(3)} UA`);
-  if (Number.isFinite(objectData.e)) lines.push(`Excentricidad (e): ${objectData.e.toFixed(3)}`);
-  if (Number.isFinite(objectData.i)) lines.push(`Inclinación (i): ${objectData.i.toFixed(2)}°`);
-  if (Number.isFinite(objectData.omega)) lines.push(`Nodo ascendente (Ω): ${objectData.omega.toFixed(2)}°`);
-  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`Arg. del perihelio (ω): ${objectData.argPeriapsis.toFixed(2)}°`);
+  lines.push(`${translate('Nombre', 'Name')}: ${objectData.name}`);
+  lines.push(`${translate('Tipo', 'Type')}: ${objectData.type === 'comet' ? translate('Cometa', 'Comet') : translate('Asteroide', 'Asteroid')}`);
+  if (Number.isFinite(objectData.diameterKm)) lines.push(`${translate('Diámetro estimado', 'Estimated diameter')}: ${objectData.diameterKm.toFixed(2)} km`);
+  if (Number.isFinite(objectData.density)) lines.push(`${translate('Densidad modelo', 'Model density')}: ${Math.round(objectData.density)} kg/m³`);
+  if (Number.isFinite(objectData.rotation_period)) lines.push(`${translate('Periodo de rotación aprox.', 'Approx. rotation period')}: ${objectData.rotation_period.toFixed(1)} h`);
+  if (Number.isFinite(objectData.velocity)) lines.push(`${translate('Velocidad estimada', 'Estimated velocity')}: ${objectData.velocity.toFixed(1)} km/s`);
+  if (Number.isFinite(objectData.a)) lines.push(`${translate('Semieje mayor (a)', 'Semi-major axis (a)')}: ${objectData.a.toFixed(3)} UA`);
+  if (Number.isFinite(objectData.e)) lines.push(`${translate('Excentricidad (e)', 'Eccentricity (e)')}: ${objectData.e.toFixed(3)}`);
+  if (Number.isFinite(objectData.i)) lines.push(`${translate('Inclinación (i)', 'Inclination (i)')}: ${objectData.i.toFixed(2)}°`);
+  if (Number.isFinite(objectData.omega)) lines.push(`${translate('Nodo ascendente (Ω)', 'Ascending node (Ω)')}: ${objectData.omega.toFixed(2)}°`);
+  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`${translate('Arg. del perihelio (ω)', 'Argument of perihelion (ω)')}: ${objectData.argPeriapsis.toFixed(2)}°`);
   const period = toNumber(objectData.raw?.p_yr);
-  if (Number.isFinite(period)) lines.push(`Período orbital: ${period.toFixed(2)} años`);
+  if (Number.isFinite(period)) lines.push(`${translate('Período orbital', 'Orbital period')}: ${period.toFixed(2)} ${translate('años', 'years')}`);
   const discoveryRaw = objectData.discoveryDate || objectData.raw?.discovery_date || objectData.raw?.disc_date || objectData.raw?.discoveryDate;
-  if (discoveryRaw) lines.push(`Descubierto: ${discoveryRaw}`);
+  if (discoveryRaw) lines.push(`${translate('Descubierto', 'Discovered')}: ${discoveryRaw}`);
   return lines.join('\n');
 }
 
@@ -1244,7 +1484,7 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectIndex = null;
     currentObjectId = null;
     updateObjectSummary(null);
-    if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    if (apiAsteroidDetails) apiAsteroidDetails.value = translate('No hay datos disponibles', 'No data available');
     updateImpactProbabilityForItem(null, { source: 'filters' });
     return;
   }
@@ -1292,8 +1532,8 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
   currentDatasetKey = key;
   isCatalogLoading = true;
   updateDatasetRadios(key);
-  setSelectLoading(objectSelect, 'Cargando catálogo...');
-  setSelectLoading(apiAsteroidSelect, 'Cargando catálogo...');
+  setSelectLoading(objectSelect, { es: 'Cargando catálogo...', en: 'Loading catalog...' });
+  setSelectLoading(apiAsteroidSelect, { es: 'Cargando catálogo...', en: 'Loading catalog...' });
   if (apiAsteroidDetails) apiAsteroidDetails.value = '';
 
   try {
@@ -1361,6 +1601,8 @@ datasetViewerRadios.forEach((radio) => {
     element.addEventListener(eventName, () => applyFilters({ preserveSelection: true }));
   });
 });
+
+setLanguage(currentLanguage);
 
 switchDataset('asteroids', { origin: 'init', forceReload: true });
 
@@ -1631,7 +1873,7 @@ function populateApiSelect() {
   apiAsteroidSelect.innerHTML = '';
 
   if (!filteredCatalog.length) {
-    setSelectLoading(apiAsteroidSelect, 'Sin datos disponibles');
+    setSelectLoading(apiAsteroidSelect, { es: 'Sin datos disponibles', en: 'No data available' });
     suppressDatasetEvents = false;
     return;
   }
@@ -1639,10 +1881,16 @@ function populateApiSelect() {
   filteredCatalog.forEach((item, idx) => {
     const opt = document.createElement('option');
     opt.value = String(idx);
-    const diameterLabel = Number.isFinite(item.diameterKm) ? `Ø ${item.diameterKm.toFixed(1)} km` : 'Ø N/D';
+    const diameterValueEs = Number.isFinite(item.diameterKm) ? `${item.diameterKm.toFixed(1)} km` : 'N/D';
+    const diameterValueEn = Number.isFinite(item.diameterKm) ? `${item.diameterKm.toFixed(1)} km` : 'N/A';
     const speedValue = Number.isFinite(item.velocity) ? item.velocity : estimateViewerSpeed(item);
-    const speedLabel = Number.isFinite(speedValue) ? `v ${speedValue.toFixed(1)} km/s` : 'v N/D';
-    opt.textContent = `${item.name} — ${diameterLabel}, ${speedLabel}`;
+    const speedValueEs = Number.isFinite(speedValue) ? `${speedValue.toFixed(1)} km/s` : 'N/D';
+    const speedValueEn = Number.isFinite(speedValue) ? `${speedValue.toFixed(1)} km/s` : 'N/A';
+    const labelEs = `${item.name} — Diámetro: ${diameterValueEs}, Velocidad: ${speedValueEs}`;
+    const labelEn = `${item.name} — Diameter: ${diameterValueEn}, Speed: ${speedValueEn}`;
+    opt.dataset.langEs = labelEs;
+    opt.dataset.langEn = labelEn;
+    opt.textContent = translate(labelEs, labelEn);
     apiAsteroidSelect.appendChild(opt);
   });
 
@@ -1656,7 +1904,7 @@ function updateApiDetails() {
   const objectData = filteredCatalog[idx];
 
   if (!objectData) {
-    apiAsteroidDetails.value = 'No hay datos disponibles';
+    apiAsteroidDetails.value = translate('No hay datos disponibles', 'No data available');
     return;
   }
 
@@ -1678,7 +1926,7 @@ function setViewerMode(mode) {
   if (mode === 'manual') {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');
-    modeToggle.textContent = 'Modo Manual';
+    updateModeToggleLabel();
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
     updateViewerRotationSpeed();
     regenerateMeteorite({
@@ -1688,7 +1936,7 @@ function setViewerMode(mode) {
   } else {
     manualControls.classList.add('hidden');
     apiControls.classList.remove('hidden');
-    modeToggle.textContent = 'Modo API';
+    updateModeToggleLabel();
     [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
     populateApiSelect();
   }
@@ -1706,12 +1954,28 @@ openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', ()=>{
     // Close viewer -> show simulation
     asteroidViewer.classList.add('hidden');
     simLayout.classList.remove('hidden');
-    if (img) img.src = './static/img/asteroid-icon.png';
+    if (img) {
+      img.src = './static/img/asteroid-icon.png';
+      img.setAttribute('data-alt-es', 'Abrir visor de asteroides');
+      img.setAttribute('data-alt-en', 'Open asteroid viewer');
+      img.setAttribute('alt', translate('Abrir visor de asteroides', 'Open asteroid viewer'));
+    }
+    openAsteroidViewerBtn.setAttribute('data-title-es', 'Abrir visor de asteroides');
+    openAsteroidViewerBtn.setAttribute('data-title-en', 'Open asteroid viewer');
+    openAsteroidViewerBtn.setAttribute('title', translate('Abrir visor de asteroides', 'Open asteroid viewer'));
   } else {
     // Open viewer -> hide simulation
     simLayout.classList.add('hidden');
     asteroidViewer.classList.remove('hidden');
-    if (img) img.src = './static/img/planet-icon.png';
+    if (img) {
+      img.src = './static/img/planet-icon.png';
+      img.setAttribute('data-alt-es', 'Cerrar visor de asteroides');
+      img.setAttribute('data-alt-en', 'Close asteroid viewer');
+      img.setAttribute('alt', translate('Cerrar visor de asteroides', 'Close asteroid viewer'));
+    }
+    openAsteroidViewerBtn.setAttribute('data-title-es', 'Cerrar visor de asteroides');
+    openAsteroidViewerBtn.setAttribute('data-title-en', 'Close asteroid viewer');
+    openAsteroidViewerBtn.setAttribute('title', translate('Cerrar visor de asteroides', 'Close asteroid viewer'));
     if (!avRenderer) initAsteroidViewerThree();
     setViewerMode('manual');
     setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
@@ -1729,7 +1993,10 @@ window.addEventListener('resize', resizeAsteroidViewer);
 
 // Flujo de simulación (sin backend)
 simulateBtn.addEventListener('click', () => {
-  if (selectedLat === null || selectedLon === null) { alert('Selecciona un punto de impacto en el mapa de la izquierda.'); return; }
+  if (selectedLat === null || selectedLon === null) {
+    alert(translate('Selecciona un punto de impacto en el mapa de la izquierda.', 'Select an impact point on the map to the left.'));
+    return;
+  }
   const payload = {
     diameter: Number(diameterInput.value),
     velocity: Number(velocityInput.value),
@@ -1740,28 +2007,12 @@ simulateBtn.addEventListener('click', () => {
   };
   const data = runSimulationTemplate(payload); // <- Aquí se conecta el modelo
   // Actualizar resultados
-  energyOut.textContent = data.impactEnergyMT.toLocaleString('es-ES', { maximumFractionDigits: 2 });
-  craterOut.textContent = data.craterDiameterKM.toLocaleString('es-ES', { maximumFractionDigits: 2 });
-  magnitudeOut.textContent = data.seismicMagnitude.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+  const locale = currentLanguage === 'en' ? 'en-US' : 'es-ES';
+  energyOut.textContent = data.impactEnergyMT.toLocaleString(locale, { maximumFractionDigits: 2 });
+  craterOut.textContent = data.craterDiameterKM.toLocaleString(locale, { maximumFractionDigits: 2 });
+  magnitudeOut.textContent = data.seismicMagnitude.toLocaleString(locale, { maximumFractionDigits: 2 });
   // Dibujar zonas
   drawEffectZones(data.impactLat, data.impactLon, data.craterDiameterKM, data.effectZones);
   // Animar 3D
   animateImpact(data.impactLat, data.impactLon);
 });
-
-// Accesibilidad: botón de modo daltónico (toggle en <body>)
-(function(){
-  const colorToggleButton = document.getElementById('color-toggle-btn');
-  if (!colorToggleButton) return;
-  // Restaurar preferencia guardada (opcional)
-  try {
-    const saved = localStorage.getItem('colorblind-mode');
-    if (saved === '1') document.body.classList.add('colorblind-mode');
-  } catch (_) {}
-  colorToggleButton.addEventListener('click', () => {
-    document.body.classList.toggle('colorblind-mode');
-    try {
-      localStorage.setItem('colorblind-mode', document.body.classList.contains('colorblind-mode') ? '1' : '0');
-    } catch (_) {}
-  });
-})();

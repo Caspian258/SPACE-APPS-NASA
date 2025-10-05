@@ -10,193 +10,182 @@
 </head>
 <body>
   <header>
-    <h1>Asteroid Impact Simulator</h1>
-    <p>Explora el impacto de asteroides y estrategias de mitigación.</p>
-    <!-- Botón (imagen) para abrir el Visor de Asteroides -->
-    <button id="openAsteroidViewerBtn" class="icon-button" title="Abrir visor de asteroides">
-      <img src="./static/img/asteroid-icon.png" alt="Abrir visor de asteroides" />
+    <h1 data-lang-es="Simulador de Impacto de Asteroides" data-lang-en="Asteroid Impact Simulator">Simulador de Impacto de Asteroides</h1>
+    <p data-lang-es="Explora el impacto de asteroides y estrategias de mitigación." data-lang-en="Explore asteroid impact scenarios and mitigation strategies.">Explora el impacto de asteroides y estrategias de mitigación.</p>
+    <button id="openAsteroidViewerBtn" class="icon-button" type="button" data-title-es="Abrir visor de asteroides" data-title-en="Open asteroid viewer" title="Abrir visor de asteroides">
+      <img src="./static/img/asteroid-icon.png" alt="Abrir visor de asteroides" data-alt-es="Abrir visor de asteroides" data-alt-en="Open asteroid viewer" />
     </button>
   </header>
 
   <main id="simLayout" class="layout">
-    <!-- Control Panel -->
     <section class="panel control">
-      <h2>Panel de Control</h2>
+      <h2 data-lang-es="Panel de Control" data-lang-en="Control Panel">Panel de Control</h2>
       <div class="control-group">
-        <label for="diameter">Diámetro del Asteroide (m)</label>
+        <label for="diameter" data-lang-es="Diámetro del Asteroide (m)" data-lang-en="Asteroid Diameter (m)">Diámetro del Asteroide (m)</label>
         <input type="range" id="diameter" min="10" max="1000" step="1" value="100" />
         <div class="value" id="diameterValue">100 m</div>
       </div>
       <div class="control-group">
-        <label for="velocity">Velocidad del Asteroide (km/s)</label>
+        <label for="velocity" data-lang-es="Velocidad del Asteroide (km/s)" data-lang-en="Asteroid Velocity (km/s)">Velocidad del Asteroide (km/s)</label>
         <input type="range" id="velocity" min="10" max="70" step="0.1" value="20" />
         <div class="value" id="velocityValue">20.0 km/s</div>
       </div>
       <div class="control-group">
-        <label for="density">Densidad (kg/m³)</label>
+        <label for="density" data-lang-es="Densidad (kg/m³)" data-lang-en="Density (kg/m³)">Densidad (kg/m³)</label>
         <input type="number" id="density" min="500" max="8000" step="100" value="3000" />
       </div>
-
       <div class="control-group">
-        <label>Selecciona el punto de impacto</label>
+        <label data-lang-es="Selecciona el punto de impacto" data-lang-en="Choose the impact point">Selecciona el punto de impacto</label>
         <div id="selectMap" class="map-select"></div>
         <div class="value small" id="impactCoords">Lat: ---, Lon: ---</div>
       </div>
-
       <div class="control-group">
-        <label for="mitigation" class="tooltip">Velocidad de Deflexión (km/s)
-          <span class="tooltiptext">Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.</span>
+        <label for="mitigation" class="tooltip">
+          <span data-lang-es="Velocidad de Deflexión (km/s)" data-lang-en="Deflection Speed (km/s)">Velocidad de Deflexión (km/s)</span>
+          <span class="tooltiptext" data-lang-es="Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria." data-lang-en="A kinetic impactor is a spacecraft that strikes the asteroid to slightly change its speed and trajectory.">Un impactador cinético es una nave que golpea al asteroide para cambiar ligeramente su velocidad y trayectoria.</span>
         </label>
         <input type="range" id="mitigation" min="0" max="0.1" step="0.001" value="0" />
         <div class="value" id="mitigationValue">0.000 km/s</div>
       </div>
-
-      <button id="simulateBtn" class="simulate">¡Simular Impacto!</button>
-
-
+      <button id="simulateBtn" class="simulate" data-lang-es="¡Simular Impacto!" data-lang-en="Simulate Impact!">¡Simular Impacto!</button>
       <div class="toggle-views">
-        <button id="show3D">Ver Globo 3D</button>
-        <button id="show2D">Ver Mapa 2D</button>
+        <button id="show3D" data-lang-es="Ver Globo 3D" data-lang-en="View 3D Globe">Ver Globo 3D</button>
+        <button id="show2D" data-lang-es="Ver Mapa 2D" data-lang-en="View 2D Map">Ver Mapa 2D</button>
       </div>
-
       <div class="control-group" style="margin-top:12px;">
-        <label>Catálogo de objetos</label>
+        <label data-lang-es="Catálogo de objetos" data-lang-en="Object Catalog">Catálogo de objetos</label>
         <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="asteroids" checked /> Asteroides
+            <input type="radio" name="datasetMain" value="asteroids" checked />
+            <span data-lang-es="Asteroides" data-lang-en="Asteroids">Asteroides</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="comets" /> Cometas
+            <input type="radio" name="datasetMain" value="comets" />
+            <span data-lang-es="Cometas" data-lang-en="Comets">Cometas</span>
           </label>
         </div>
       </div>
-
       <div class="control-group">
-        <label for="objectSelect">Seleccionar objeto</label>
+        <label for="objectSelect" data-lang-es="Seleccionar objeto" data-lang-en="Select object">Seleccionar objeto</label>
         <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-          <option value="">Cargando catálogo...</option>
+          <option value="" data-lang-es="Cargando catálogo..." data-lang-en="Loading catalog...">Cargando catálogo...</option>
         </select>
         <div class="value small" id="objectSummary">--</div>
       </div>
-
       <div class="control-group" style="margin-top:12px;">
-        <label for="filterName">Buscar por nombre</label>
-        <input type="text" id="filterName" placeholder="Ej: Apophis" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+        <label for="filterName" data-lang-es="Buscar por nombre" data-lang-en="Search by name">Buscar por nombre</label>
+        <input type="text" id="filterName" placeholder="Ej: Apophis" data-placeholder-es="Ej: Apophis" data-placeholder-en="E.g. Apophis" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
       </div>
-
       <div class="control-group" style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
-          <label for="filterMinDiameter">Diámetro mínimo (km)</label>
-          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          <label for="filterMinDiameter" data-lang-es="Diámetro mínimo (km)" data-lang-en="Minimum diameter (km)">Diámetro mínimo (km)</label>
+          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" data-placeholder-es="0.0" data-placeholder-en="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
         <div>
-          <label for="filterMinVelocity">Velocidad mínima (km/s)</label>
-          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
+          <label for="filterMinVelocity" data-lang-es="Velocidad mínima (km/s)" data-lang-en="Minimum velocity (km/s)">Velocidad mínima (km/s)</label>
+          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" data-placeholder-es="0.0" data-placeholder-en="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
       </div>
-
       <div class="control-group" style="margin-top:6px;">
-        <label>Rango de fechas de descubrimiento</label>
+        <label data-lang-es="Rango de fechas de descubrimiento" data-lang-en="Discovery date range">Rango de fechas de descubrimiento</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <input type="date" id="filterDateStart" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
           <input type="date" id="filterDateEnd" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
         </div>
       </div>
-      <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;">Calcular Probabilidad de Impacto</button>
+      <button id="calculate-prob-btn" class="simulate" style="margin-top:8px;" data-lang-es="Calcular Probabilidad de Impacto" data-lang-en="Calculate Impact Probability">Calcular Probabilidad de Impacto</button>
     </section>
 
-    <!-- Visualization -->
     <section class="panel visualize">
       <div id="globe3D" class="viz"></div>
       <div id="map2D" class="viz hidden"></div>
     </section>
 
-    <!-- Results Panel -->
     <section class="panel results">
-      <h2>Resultados</h2>
+      <h2 data-lang-es="Resultados" data-lang-en="Results">Resultados</h2>
       <ul class="results-list">
-        <li><strong>Energía de Impacto:</strong> <span id="energy">--</span> Megatones</li>
-        <li><strong>Diámetro del Cráter:</strong> <span id="crater">--</span> km</li>
-        <li><strong>Magnitud Sísmica Estimada:</strong> <span id="magnitude">--</span> Richter</li>
-        <li><strong>Probabilidad de Impacto por Órbita (debug):</strong> <span id="probability-result">--</span></li>
+        <li>
+          <strong data-lang-es="Energía de Impacto:" data-lang-en="Impact Energy:">Energía de Impacto:</strong>
+          <span id="energy">--</span>
+          <span data-lang-es="Megatones" data-lang-en="Megatons">Megatones</span>
+        </li>
+        <li><strong data-lang-es="Tipo de cráter:" data-lang-en="Crater type:">Tipo de cráter:</strong> <span class="value" id="craterType">--</span></li>
+        <li><strong data-lang-es="Diámetro inicial:" data-lang-en="Initial diameter:">Diámetro inicial:</strong> <span class="value" id="D_tc">--</span> <span data-lang-es="m" data-lang-en="m">m</span></li>
+        <li><strong data-lang-es="Diámetro final:" data-lang-en="Final diameter:">Diámetro final:</strong> <span class="value" id="D_fr">--</span> <span data-lang-es="m" data-lang-en="m">m</span></li>
+        <li><strong data-lang-es="Profundidad final:" data-lang-en="Final depth:">Profundidad final:</strong> <span class="value" id="d_fr">--</span> <span data-lang-es="m" data-lang-en="m">m</span></li>
+        <li><strong data-lang-es="Altura de cresta:" data-lang-en="Rim height:">Altura de cresta:</strong> <span class="value" id="h_fr">--</span> <span data-lang-es="m" data-lang-en="m">m</span></li>
+        <li><strong data-lang-es="Probabilidad de Impacto por Órbita (debug):" data-lang-en="Impact Probability per Orbit (debug):">Probabilidad de Impacto por Órbita (debug):</strong> <span id="probability-result">--</span></li>
       </ul>
-
       <div class="neo-picker hidden" id="neoPicker">
-        <h3>Selecciona un NEO</h3>
-        <div class="value small">Fuente: NASA NeoWs (demo)</div>
+        <h3 data-lang-es="Selecciona un NEO" data-lang-en="Select a NEO">Selecciona un NEO</h3>
+        <div class="value small" data-lang-es="Fuente: NASA NeoWs (demo)" data-lang-en="Source: NASA NeoWs (demo)">Fuente: NASA NeoWs (demo)</div>
         <select id="neoSelect" style="width:100%;margin:8px 0;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
         <div class="value small" id="neoDetails">--</div>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="applyNeo" class="simulate" style="flex:1;background:#2a7de1">Aplicar</button>
-          <button id="closeNeo" class="simulate" style="flex:1;background:#444e5f">Cerrar</button>
+          <button id="applyNeo" class="simulate" style="flex:1;background:#2a7de1" data-lang-es="Aplicar" data-lang-en="Apply">Aplicar</button>
+          <button id="closeNeo" class="simulate" style="flex:1;background:#444e5f" data-lang-es="Cerrar" data-lang-en="Close">Cerrar</button>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- Visor de Asteroides (oculto por defecto) -->
   <div id="asteroidViewer" class="viewer hidden">
     <div class="viewer-header">
-      <h2>Visor de Asteroides</h2>
+      <h2 data-lang-es="Visor de Asteroides" data-lang-en="Asteroid Viewer">Visor de Asteroides</h2>
     </div>
     <div class="viewer-grid">
-      <!-- Columna Izquierda: Controles e Información -->
       <div class="viewer-left">
         <div class="control-group" style="margin-top:0;">
-          <label for="modeToggle">Modo</label>
-          <button id="modeToggle" class="toggle">Modo Manual</button>
-          <div class="value small">Pulsa para alternar entre Manual y API</div>
+          <label for="modeToggle" data-lang-es="Modo" data-lang-en="Mode">Modo</label>
+          <button id="modeToggle" class="toggle" data-label-manual-es="Modo Manual" data-label-manual-en="Manual Mode" data-label-api-es="Modo API" data-label-api-en="API Mode">Modo Manual</button>
+          <div class="value small" data-lang-es="Pulsa para alternar entre Manual y API" data-lang-en="Press to toggle between Manual and API">Pulsa para alternar entre Manual y API</div>
         </div>
-
-        <!-- Controles: Modo Manual -->
         <div id="manualControls">
           <div class="control-group">
-            <label for="manDiameter">Diámetro (km)</label>
+            <label for="manDiameter" data-lang-es="Diámetro (km)" data-lang-en="Diameter (km)">Diámetro (km)</label>
             <input type="range" id="manDiameter" min="0.1" max="1000" step="0.1" value="50" />
             <div class="value" id="manDiameterValue">50.0 km</div>
           </div>
           <div class="control-group">
-            <label for="manSpeed">Velocidad (unid.)</label>
+            <label for="manSpeed" data-lang-es="Velocidad (unid.)" data-lang-en="Speed (units)">Velocidad (unid.)</label>
             <input type="range" id="manSpeed" min="0" max="60" step="0.1" value="10" />
             <div class="value" id="manSpeedValue">10.0</div>
           </div>
           <div class="control-group">
-            <label for="manDensity">Densidad (kg/m³)</label>
+            <label for="manDensity" data-lang-es="Densidad (kg/m³)" data-lang-en="Density (kg/m³)">Densidad (kg/m³)</label>
             <input type="range" id="manDensity" min="500" max="8000" step="100" value="3000" />
             <div class="value" id="manDensityValue">3000 kg/m³</div>
           </div>
           <div class="control-group">
-            <label for="manRotation">Rotación (°/s)</label>
+            <label for="manRotation" data-lang-es="Rotación (°/s)" data-lang-en="Rotation (°/s)">Rotación (°/s)</label>
             <input type="range" id="manRotation" min="0" max="30" step="0.1" value="5" />
             <div class="value" id="manRotationValue">5.0 °/s</div>
           </div>
         </div>
-
-        <!-- Controles: Modo API -->
         <div id="apiControls" class="hidden">
           <div class="control-group">
-            <label>Fuente de datos</label>
+            <label data-lang-es="Fuente de datos" data-lang-en="Data source">Fuente de datos</label>
             <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
               <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="asteroids" checked /> Asteroides
+                <input type="radio" name="datasetViewer" value="asteroids" checked />
+                <span data-lang-es="Asteroides" data-lang-en="Asteroids">Asteroides</span>
               </label>
               <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="comets" /> Cometas
+                <input type="radio" name="datasetViewer" value="comets" />
+                <span data-lang-es="Cometas" data-lang-en="Comets">Cometas</span>
               </label>
             </div>
           </div>
           <div class="control-group">
-            <label for="apiAsteroidSelect">Lista de asteroides (catálogo)</label>
+            <label for="apiAsteroidSelect" data-lang-es="Lista de asteroides (catálogo)" data-lang-en="Asteroid list (catalog)">Lista de asteroides (catálogo)</label>
             <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
           </div>
           <div class="control-group">
-            <label for="apiAsteroidDetails">Detalles</label>
+            <label for="apiAsteroidDetails" data-lang-es="Detalles" data-lang-en="Details">Detalles</label>
             <textarea id="apiAsteroidDetails" rows="6" readonly style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;resize:vertical;"></textarea>
           </div>
         </div>
       </div>
-
-      <!-- Columna Derecha: Visualización 3D -->
       <div class="viewer-right">
         <div id="asteroidCanvas" class="viz"></div>
       </div>
@@ -204,12 +193,45 @@
   </div>
 
   <footer>
-    <small>Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
-    <!-- Botón para modo amigable para daltónicos -->
-    <button id="color-toggle-btn" class="footer-icon-button" title="Modo daltónico">
-      <img src="./static/img/accessibility-icon.png" alt="Accesibilidad" />
-    </button>
-  </footer> 
+    <small data-lang-es="Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)" data-lang-en="Data: NASA APIs and USGS (simulated). This simulator is educational and simplified. (Front-end standalone)">Datos: NASA APIs y USGS (simulados). Este simulador es educativo y simplificado. (Front-end standalone)</small>
+    <div class="menu-container">
+      <button id="menu-toggle-btn" class="menu-icon-button" type="button" aria-haspopup="true" aria-expanded="false" data-title-es="Abrir menú de opciones" data-title-en="Open options menu" title="Abrir menú de opciones">
+        <img src="./static/img/accessibility-icon.png" alt="Menú de opciones" data-alt-es="Menú de opciones" data-alt-en="Options menu" />
+      </button>
+      <ul id="options-menu" class="menu-list hidden" aria-hidden="true">
+        <li><a href="#" id="edu-btn" data-lang-es="Educación" data-lang-en="Education">Educación</a></li>
+        <li><a href="#" id="faq-btn" data-lang-es="FAQ" data-lang-en="FAQ">FAQ</a></li>
+        <li><a href="#" id="lang-es-btn" data-lang-es="Español" data-lang-en="Spanish">Español</a></li>
+        <li><a href="#" id="lang-en-btn" data-lang-es="Inglés" data-lang-en="English">Inglés</a></li>
+        <li><a href="#" id="colorblind-btn" data-lang-es="Modo Daltónico" data-lang-en="Colorblind Mode">Modo Daltónico</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <div id="faq-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="faq-modal-title" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <button id="faq-close-btn" class="modal-close" type="button" data-lang-es="Cerrar" data-lang-en="Close">Cerrar</button>
+      <h2 id="faq-modal-title" data-lang-es="Preguntas frecuentes" data-lang-en="Frequently Asked Questions">Preguntas frecuentes</h2>
+      <div class="faq-content">
+        <article class="faq-item">
+          <h3 data-lang-es="¿Qué es el simulador?" data-lang-en="What is the simulator?">¿Qué es el simulador?</h3>
+          <p data-lang-es="Es una experiencia interactiva que permite ajustar parámetros de un asteroide y visualizar sus efectos potenciales sobre la Tierra." data-lang-en="It is an interactive experience that lets you adjust asteroid parameters and visualize their potential effects on Earth.">Es una experiencia interactiva que permite ajustar parámetros de un asteroide y visualizar sus efectos potenciales sobre la Tierra.</p>
+        </article>
+        <article class="faq-item">
+          <h3 data-lang-es="¿De dónde provienen los datos?" data-lang-en="Where do the data come from?">¿De dónde provienen los datos?</h3>
+          <p data-lang-es="Utilizamos catálogos simulados basados en fuentes públicas como NASA NeoWs y USGS para ilustrar posibles escenarios." data-lang-en="We use simulated catalogs inspired by public sources such as NASA NeoWs and the USGS to illustrate possible scenarios.">Utilizamos catálogos simulados basados en fuentes públicas como NASA NeoWs y USGS para ilustrar posibles escenarios.</p>
+        </article>
+        <article class="faq-item">
+          <h3 data-lang-es="¿Puedo usarlo sin conexión?" data-lang-en="Can I use it offline?">¿Puedo usarlo sin conexión?</h3>
+          <p data-lang-es="Sí. El proyecto es completamente frontend y puede abrirse directamente en un navegador moderno." data-lang-en="Yes. The project is fully frontend and can be opened directly in any modern browser.">Sí. El proyecto es completamente frontend y puede abrirse directamente en un navegador moderno.</p>
+        </article>
+        <article class="faq-item">
+          <h3 data-lang-es="¿Las predicciones son precisas?" data-lang-en="Are the predictions accurate?">¿Las predicciones son precisas?</h3>
+          <p data-lang-es="No. Los resultados son estimaciones educativas para demostrar conceptos de mitigación y análisis de impacto." data-lang-en="No. The results are educational estimates meant to illustrate mitigation and impact analysis concepts.">No. Los resultados son estimaciones educativas para demostrar conceptos de mitigación y análisis de impacto.</p>
+        </article>
+      </div>
+    </div>
+  </div>
 
   <!-- Leaflet JS (CDN) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
