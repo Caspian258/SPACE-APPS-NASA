@@ -1,0 +1,30 @@
+full_name,a,e,i,om,w,q,ad,H,diameter,ma,E_rad,E_deg
+Parámetros Asteroides
+object_fullname	
+    Nombre completo del objeto (asteroide o cometa).
+a	
+    Semieje mayor de la órbita en unidades astronómicas (AU). Representa el tamaño promedio de la órbita.
+e	
+    Excentricidad de la órbita. Mide qué tan elíptica es la órbita: 0 = circular, 0-1 = elíptica.
+i	
+    Inclinación de la órbita en grados respecto al plano de la eclíptica.
+node (om)	
+    Longitud del nodo ascendente (Ω) en grados: dónde la órbita cruza el plano de la eclíptica de sur a norte.
+w	
+    Argumento del perihelio (ω) en grados: orientación de la órbita dentro del plano orbital, desde el nodo ascendente hasta el perihelio.
+q	
+    Distancia al perihelio en AU: el punto más cercano al Sol.
+Q / ad	
+    Distancia al afelio en AU: el punto más lejano al Sol.
+
+H	
+    Magnitud absoluta: brillo intrínseco del objeto si estuviera a 1 AU del Sol y 1 AU de la Tierra. Sirve para estimar tamaño aproximado.
+
+Diameter
+    Object Diameter M
+Ma
+    Mean Anomaly Deg
+E_deg
+    Eccentricity Anomaly deg
+E_rad
+    Eccentricity Anomaly rad
