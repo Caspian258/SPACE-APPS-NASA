@@ -140,9 +140,72 @@ show2D.addEventListener('click', () => { map2D.classList.remove('hidden'); globe
 
 // Three.js (UMD) expone window.THREE cuando se carga desde <script>
 const THREE_NS = window.THREE;
-let renderer, scene, camera, earthMesh, asteroidMesh, trajectoryLine, starSphere, moonMesh, sunLight, earthGroup;
-let isDragging = false; 
+let renderer, scene, camera;
+let earthMesh, moonMesh, sunMesh, starSphere;
+let earthGroup, sunGroup, sunLight;
+let isDragging = false;
 
+let rotVelX = 0, rotVelY = 0; 
+const rotationDamping = 0.95; 
+const rotationSpeedFactor = 0.005; 
+// Contenedor para el Sol
+let sunAngle = 0; 
+const sunOrbitRadius = 5; 
+const sunOrbitSpeed = 0.002; 
+let isPaused = false;
+
+
+// Variable para controlar el seguimiento de la Tierra
+let isFollowingEarth = false; 
+
+// Contenedor del DOM (USANDO NOMBRE ALTERNATIVO: threeContainer)
+const threeContainer = document.getElementById('globe3D') || { 
+    clientWidth: 600, 
+    clientHeight: 400, 
+    innerHTML: '', 
+    appendChild: () => {} 
+};
+// --- Función genérica para crear planetas -__
+function createPlanet({
+    name,
+    texturePath,
+    radius = 1,
+    segments = 64,
+    shininess = 5,
+    specular = 0x333333,
+    transparent = false,
+    opacity = 1,
+    emissive = 0x000000
+}) {
+    const textureLoader = new THREE_NS.TextureLoader();
+    const texture = textureLoader.load(
+        texturePath,
+        () => console.log(`🪐 Textura de ${name} cargada`),
+        undefined,
+        (err) => console.warn(`⚠️ Error al cargar textura de ${name}:`, err)
+    );
+
+    // MeshPhongMaterial es esencial para que la luz y las sombras funcionen.
+    const material = new THREE_NS.MeshPhongMaterial({
+        map: texture,
+        shininess,
+        specular,
+        transparent,
+        opacity,
+        emissive
+    });
+    
+    const mesh = new THREE_NS.Mesh(
+        new THREE_NS.SphereGeometry(radius, segments, segments),
+        material
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    return mesh;
+}
+
+// --- Inicialización principal ---
 function initThree() {
   if (!THREE_NS) {
     globe3D.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
