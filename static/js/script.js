@@ -34,6 +34,8 @@ const energyOut = document.getElementById('energy');
 const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
+const impactProbabilityOut = document.getElementById('impactProbability');
+const calculateProbBtn = document.getElementById('calculate-prob-btn');
 
 
 
@@ -95,8 +97,14 @@ function updateSliderDisplays() {
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
   mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
 }
-[diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
+[diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
+
+if (calculateProbBtn) {
+  calculateProbBtn.addEventListener('click', () => {
+    updateImpactProbabilityForItem(getCurrentSelectedItem());
+  });
+}
 
 // Leaflet: mapa de selección (pequeño)
 const selectionMap = L.map('selectMap', {
@@ -742,6 +750,64 @@ function toNumber(value, fallback = NaN) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function pickFiniteNumber(...values) {
+  for (const value of values) {
+    const numeric = toNumber(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+}
+
+function extractOrbitalParameters(item) {
+  if (!item) return { a: null, e: null, inc: null };
+  const raw = item.raw || {};
+  const a = pickFiniteNumber(raw.a, raw.semi_major_axis, raw.semiMajorAxis, item.a);
+  const e = pickFiniteNumber(raw.e, raw.eccentricity, item.e);
+  const inc = pickFiniteNumber(raw.i, raw.i_deg, raw.inclination, item.i);
+  return { a, e, inc };
+}
+
+function computeImpactProbabilityValue(a, e, inc) {
+  if (typeof impactProbabilityAdvanced !== 'function') return null;
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) return null;
+  try {
+    const result = impactProbabilityAdvanced(a, e, inc);
+    if (typeof result === 'number') {
+      return result;
+    }
+    if (result && typeof result === 'object') {
+      if (Number.isFinite(result.Pcoll)) return result.Pcoll;
+      if (Number.isFinite(result.pcoll)) return result.pcoll;
+    }
+  } catch (error) {
+    console.error('Error calculando la probabilidad de impacto:', error);
+  }
+  return null;
+}
+
+function updateImpactProbabilityForItem(item) {
+  if (!impactProbabilityOut) return;
+  const { a, e, inc } = extractOrbitalParameters(item);
+  const probability = computeImpactProbabilityValue(a, e, inc);
+  if (Number.isFinite(probability)) {
+    const percentage = (probability * 100).toFixed(6);
+    impactProbabilityOut.textContent = `${percentage}%`;
+  } else {
+    impactProbabilityOut.textContent = '--';
+  }
+}
+
+function getCurrentSelectedItem() {
+  if (Number.isInteger(currentObjectIndex) && currentObjectIndex >= 0 && filteredCatalog[currentObjectIndex]) {
+    return filteredCatalog[currentObjectIndex];
+  }
+  if (objectSelect) {
+    const idx = Number(objectSelect.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) return filteredCatalog[idx];
+  }
+  return null;
+}
+
 function rotationPeriodToViewerSpeed(rotationPeriodHours) {
   const hours = toNumber(rotationPeriodHours, 6);
   if (!Number.isFinite(hours) || hours <= 0) return 5;
@@ -971,6 +1037,7 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   if (updateDetails && apiAsteroidDetails) {
     apiAsteroidDetails.value = formatObjectDetails(selected);
   }
+  updateImpactProbabilityForItem(selected);
 }
 
 function parseDiscoveryDate(value) {
@@ -1034,6 +1101,7 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectId = null;
     updateObjectSummary(null);
     if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    updateImpactProbabilityForItem(null);
     return;
   }
 
@@ -1110,7 +1178,12 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
 if (objectSelect) {
   objectSelect.addEventListener('change', () => {
     if (suppressDatasetEvents) return;
-    const idx = Number(objectSelect.value || 0);
+    const value = objectSelect.value;
+    const idx = Number(value);
+    if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+      updateImpactProbabilityForItem(null);
+      return;
+    }
     setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
   });
 }
