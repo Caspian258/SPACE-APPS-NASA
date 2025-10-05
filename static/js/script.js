@@ -38,6 +38,8 @@ const energyOut = document.getElementById('energy');
 const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
+const probabilityDebugOut = document.getElementById('probability-result');
+const calculateProbBtn = document.getElementById('calculate-prob-btn');
 
 
 
@@ -99,8 +101,15 @@ function updateSliderDisplays() {
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
   mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
 }
-[diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
+[diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
+
+if (calculateProbBtn) {
+  calculateProbBtn.addEventListener('click', () => {
+    const selectedObject = getCurrentSelectedItem();
+    computeAndDisplayImpactProbability(selectedObject, { source: 'button' });
+  });
+}
 
 // Leaflet: mapa de selección (pequeño)
 const selectionMap = L.map('selectMap', {
@@ -746,6 +755,205 @@ function toNumber(value, fallback = NaN) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function pickFiniteNumber(...values) {
+  for (const value of values) {
+    const numeric = toNumber(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+}
+
+function extractOrbitalParameters(item) {
+  if (!item) return { a: null, e: null, inc: null };
+  const raw = item.raw || {};
+  const a = pickFiniteNumber(raw.a, raw.semi_major_axis, raw.semiMajorAxis, item.a);
+  const e = pickFiniteNumber(raw.e, raw.eccentricity, item.e);
+  const inc = pickFiniteNumber(raw.i, raw.i_deg, raw.inclination, item.i);
+  return { a, e, inc };
+}
+
+// ========== FUNCIÓN DE PROBABILIDAD DE IMPACTO (MÉTODO DE ÖPIK) ==========
+function impactProbabilityAdvanced({
+  a, e, inc, at = 1.0, et = 0.0167,
+  Rt_km = 6371, Mt = 5.97219e24,
+  samples = 1000, useGravFocus = true,
+  GMsun = 1.32712440018e20, AU_m = 1.495978707e11
+} = {}) {
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) {
+    return { Pcoll: NaN, a, e, inc };
+  }
+
+  if (samples % 2 !== 0) samples++;
+  const i = inc * Math.PI / 180;
+  const Rt = Rt_km * 1000;
+  const G = 6.67430e-11;
+
+  function radiusRcoll(U, Ve) {
+    const ratio = Math.max(U, 1e-12);
+    return Rt * Math.sqrt(1 + (Ve * Ve) / (ratio * ratio));
+  }
+
+  function V_target_at_r(rho_AU) {
+    const r = rho_AU * AU_m;
+    const atSI = at * AU_m;
+    return Math.sqrt(Math.max(0, GMsun * (2 / r - 1 / atSI)));
+  }
+
+  function tisserand_rho(rho_AU) {
+    return (rho_AU / a) + 2 * Math.sqrt((a / rho_AU) * (1 - e * e)) * Math.cos(i);
+  }
+
+  const Ve = Math.sqrt(2 * G * Mt / Rt);
+
+  function integrand_nu(nu) {
+    const denom = 1 + et * Math.cos(nu);
+    if (Math.abs(denom) < 1e-12) return 0;
+    const rho = at * (1 - et * et) / denom;
+    const Vt = V_target_at_r(rho);
+    const T_r = tisserand_rho(rho);
+    const tmp = 3 - T_r;
+    if (tmp <= 0) return 0;
+    const U = Vt * Math.sqrt(tmp);
+    const Rcoll = useGravFocus ? radiusRcoll(U, Ve) : Rt;
+    const bracket = 2 - (rho / a) - (a / rho) * (1 - e * e);
+    if (bracket <= 0) return 0;
+    const prefactor = 1 / (4 * Math.PI * Math.sin(i));
+    const Rcoll_over_at_sq = (Rcoll / (at * AU_m)) ** 2;
+    const factor_speed = U * Math.sqrt(rho * AU_m) / Math.sqrt(GMsun * (1 - et * et));
+    const PE_single = prefactor * Rcoll_over_at_sq * factor_speed / Math.sqrt(bracket);
+    return 4 * PE_single;
+  }
+
+  const a_nu = 0;
+  const b_nu = Math.PI;
+  const n = samples;
+  const h = (b_nu - a_nu) / n;
+  let integral = 0;
+
+  for (let k = 0; k <= n; k++) {
+    const nu = a_nu + k * h;
+    const y = integrand_nu(nu);
+    if (k === 0 || k === n) integral += y;
+    else if (k % 2 === 1) integral += 4 * y;
+    else integral += 2 * y;
+  }
+
+  integral *= (h / 3);
+  const Pcoll = integral / Math.PI;
+
+  return { Pcoll, a, e, inc, at, et, Rt_km, Mt, useGravFocus, samples };
+}
+
+function computeImpactProbabilityValue(a, e, inc) {
+  if (typeof impactProbabilityAdvanced !== 'function') return null;
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) return null;
+  try {
+    const result = impactProbabilityAdvanced({ a, e, inc });
+    if (result && typeof result === 'object') {
+      if (Number.isFinite(result.Pcoll)) return result.Pcoll;
+      if (Number.isFinite(result.pcoll)) return result.pcoll;
+    }
+    if (Number.isFinite(result)) return result;
+  } catch (error) {
+    console.error('Error calculando la probabilidad de impacto:', error);
+  }
+  return null;
+}
+
+function updateImpactProbabilityForItem(item, { source = 'update' } = {}) {
+  const { a, e, inc } = extractOrbitalParameters(item);
+  const probability = computeImpactProbabilityValue(a, e, inc);
+  outputProbabilityDebug(probability, source);
+}
+
+// Unifica mapeo -> cálculo -> visualización con logs
+function computeAndDisplayImpactProbability(selectedObject, opts = {}) {
+  const { source = 'handler' } = opts;
+  // 1. Verificar el objeto seleccionado
+  console.log(`[${source}] 1. Objeto seleccionado:`, selectedObject);
+  if (!selectedObject) {
+    outputProbabilityDebug(null, source);
+    return;
+  }
+
+  // 2. Mapear y convertir parámetros (a, e, inc)
+  const raw = selectedObject && selectedObject.raw ? selectedObject.raw : selectedObject;
+  const parseNum = (v) => {
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  let a = parseNum(raw.semi_major_axis);
+  if (isNaN(a)) a = parseNum(raw.a);
+  if (isNaN(a)) a = parseNum(selectedObject.a);
+  if (isNaN(a)) a = parseNum(raw.q_au_2);
+
+  let e = parseNum(raw.eccentricity);
+  if (isNaN(e)) e = parseNum(raw.e);
+  if (isNaN(e)) e = parseNum(selectedObject.e);
+
+  let inc = parseNum(raw.inclination);
+  if (isNaN(inc)) inc = parseNum(raw.i);
+  if (isNaN(inc)) inc = parseNum(raw.i_deg);
+  if (isNaN(inc)) inc = parseNum(selectedObject.i);
+
+  if ((isNaN(a) || a <= 0) && Number.isFinite(e)) {
+    const q = parseNum(raw.q_au_1);
+    if (Number.isFinite(q)) {
+      const denom = Math.max(1e-6, 1 - e);
+      a = q / denom;
+    }
+  }
+
+  const params = { a, e, inc };
+  console.log(`[${source}] 2. Parámetros para la función:`, params);
+
+  // 3. Calcular y registrar el resultado crudo
+  let result = null;
+  try {
+    result = impactProbabilityAdvanced(params);
+  } catch (err) {
+    console.error(`[${source}] Error llamando a impactProbabilityAdvanced:`, err);
+    result = null;
+  }
+
+  // 4. Mostrar el resultado en la UI
+  let valueToShow = null;
+  if (typeof result === 'number' && Number.isFinite(result)) {
+    valueToShow = result;
+  } else if (result && typeof result === 'object') {
+    const candidate = Number.isFinite(result?.Pcoll) ? result.Pcoll
+                    : Number.isFinite(result?.pcoll) ? result.pcoll
+                    : undefined;
+    if (Number.isFinite(candidate)) valueToShow = candidate;
+  }
+
+  outputProbabilityDebug(valueToShow, source);
+}
+
+function outputProbabilityDebug(probability, source = 'debug') {
+  const label = `[${source}] Debug - Probabilidad de Impacto (%):`;
+  if (Number.isFinite(probability)) {
+    const pct = probability;
+    const formatted = `${pct.toExponential(4)}%`;
+    if (probabilityDebugOut) probabilityDebugOut.textContent = formatted;
+    console.log(label, formatted);
+  } else {
+    if (probabilityDebugOut) probabilityDebugOut.textContent = '--';
+    console.log(label, '--');
+  }
+}
+
+function getCurrentSelectedItem() {
+  if (Number.isInteger(currentObjectIndex) && currentObjectIndex >= 0 && filteredCatalog[currentObjectIndex]) {
+    return filteredCatalog[currentObjectIndex];
+  }
+  if (objectSelect) {
+    const idx = Number(objectSelect.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) return filteredCatalog[idx];
+  }
+  return null;
+}
+
 function rotationPeriodToViewerSpeed(rotationPeriodHours) {
   const hours = toNumber(rotationPeriodHours, 6);
   if (!Number.isFinite(hours) || hours <= 0) return 5;
@@ -958,7 +1166,7 @@ function applyObjectToViewer(objectData) {
   updateViewerRotationSpeed();
 }
 
-function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false } = {}) {
+function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false, updateProbability = true } = {}) {
   if (!Array.isArray(filteredCatalog) || !filteredCatalog[index]) return;
   currentObjectIndex = index;
   const selected = filteredCatalog[index];
@@ -974,6 +1182,9 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   }
   if (updateDetails && apiAsteroidDetails) {
     apiAsteroidDetails.value = formatObjectDetails(selected);
+  }
+  if (updateProbability) {
+    updateImpactProbabilityForItem(selected, { source: 'active-object' });
   }
 }
 
@@ -1038,6 +1249,7 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectId = null;
     updateObjectSummary(null);
     if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    updateImpactProbabilityForItem(null, { source: 'filters' });
     return;
   }
 
@@ -1114,8 +1326,16 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
 if (objectSelect) {
   objectSelect.addEventListener('change', () => {
     if (suppressDatasetEvents) return;
-    const idx = Number(objectSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
+    const value = objectSelect.value;
+    const idx = Number(value);
+    if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+      updateImpactProbabilityForItem(null, { source: 'dropdown' });
+      return;
+    }
+
+    const selectedObject = filteredCatalog[idx];
+    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true, updateProbability: false });
+    computeAndDisplayImpactProbability(selectedObject, { source: 'dropdown' });
   });
 }
 
