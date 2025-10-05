@@ -53,54 +53,33 @@
 
       <button id="simulateBtn" class="simulate">¡Simular Impacto!</button>
 
+      <button id="loadNeoBtn" class="simulate" style="background:#3bb273">Cargar Asteroide Real</button>
+      <div class="control-group" style="margin-top:6px;">
+        <label>Rango de fechas (NeoWs)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="date" id="neoStart" value="2015-09-07" style="flex:1; padding:8px; background:#0b1526; border:1px solid #22304a; color:#e8eef5; border-radius:6px;" />
+          <input type="date" id="neoEnd" value="2015-09-08" style="flex:1; padding:8px; background:#0b1526; border:1px solid #22304a; color:#e8eef5; border-radius:6px;" />
+        </div>
+      </div>
+      <div class="control-group" style="margin-top:6px;">
+        <label for="neoMinDiameter">Diámetro mínimo (m) para el listado</label>
+        <input type="number" id="neoMinDiameter" min="0" step="10" value="50" />
+      </div>
+      <div class="control-group" style="margin-top:6px;">
+        <label>Velocidad (km/s)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="neoMinVel" placeholder="mín" min="0" step="0.1" style="flex:1; padding:8px; background:#0b1526; border:1px solid #22304a; color:#e8eef5; border-radius:6px;" />
+          <input type="number" id="neoMaxVel" placeholder="máx" min="0" step="0.1" style="flex:1; padding:8px; background:#0b1526; border:1px solid #22304a; color:#e8eef5; border-radius:6px;" />
+        </div>
+      </div>
+      <div class="control-group" style="margin-top:6px;">
+        <label for="neoSearch">Buscar por nombre</label>
+        <input type="text" id="neoSearch" placeholder="Ej: Apophis" />
+      </div>
 
       <div class="toggle-views">
         <button id="show3D">Ver Globo 3D</button>
         <button id="show2D">Ver Mapa 2D</button>
-      </div>
-
-      <div class="control-group" style="margin-top:12px;">
-        <label>Catálogo de objetos</label>
-        <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="asteroids" checked /> Asteroides
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;">
-            <input type="radio" name="datasetMain" value="comets" /> Cometas
-          </label>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <label for="objectSelect">Seleccionar objeto</label>
-        <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
-          <option value="">Cargando catálogo...</option>
-        </select>
-        <div class="value small" id="objectSummary">--</div>
-      </div>
-
-      <div class="control-group" style="margin-top:12px;">
-        <label for="filterName">Buscar por nombre</label>
-        <input type="text" id="filterName" placeholder="Ej: Apophis" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-      </div>
-
-      <div class="control-group" style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div>
-          <label for="filterMinDiameter">Diámetro mínimo (km)</label>
-          <input type="number" id="filterMinDiameter" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-        </div>
-        <div>
-          <label for="filterMinVelocity">Velocidad mínima (km/s)</label>
-          <input type="number" id="filterMinVelocity" min="0" step="0.1" placeholder="0.0" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-        </div>
-      </div>
-
-      <div class="control-group" style="margin-top:6px;">
-        <label>Rango de fechas de descubrimiento</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="date" id="filterDateStart" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-          <input type="date" id="filterDateEnd" style="flex:1;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;" />
-        </div>
       </div>
     </section>
 
@@ -118,6 +97,22 @@
         <li><strong>Diámetro del Cráter:</strong> <span id="crater">--</span> km</li>
         <li><strong>Magnitud Sísmica Estimada:</strong> <span id="magnitude">--</span> Richter</li>
       </ul>
+
+      <h3>Capas de Datos</h3>
+      <div class="layers">
+        <label><input type="checkbox" id="toggleSeismic" checked /> Zonas sísmicas (USGS simulado)</label>
+        <label><input type="checkbox" id="togglePopulation" checked /> Densidad poblacional (simulado)</label>
+      </div>
+
+      <h3 style="margin-top:14px;">Leyenda</h3>
+      <div class="legend-list">
+        <div class="legend-item"><span class="swatch" style="background:#ffcc00"></span> Cráter</div>
+        <div class="legend-item"><span class="swatch" style="background:#ff4d4d"></span> Destrucción Total</div>
+        <div class="legend-item"><span class="swatch" style="background:#ff784d"></span> Daños Severos</div>
+      </div>
+
+      <h3 style="margin-top:14px;">Historial de NEOs</h3>
+      <div id="neoHistory" class="neo-history"></div>
 
       <div class="neo-picker hidden" id="neoPicker">
         <h3>Selecciona un NEO</h3>
@@ -173,17 +168,6 @@
         <!-- Controles: Modo API -->
         <div id="apiControls" class="hidden">
           <div class="control-group">
-            <label>Fuente de datos</label>
-            <div class="radio-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="asteroids" checked /> Asteroides
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;">
-                <input type="radio" name="datasetViewer" value="comets" /> Cometas
-              </label>
-            </div>
-          </div>
-          <div class="control-group">
             <label for="apiAsteroidSelect">Lista de asteroides (catálogo)</label>
             <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
           </div>
@@ -213,8 +197,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Three.js UMD estable para file:// (r149) -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.149.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="./database.js"></script>
   <script src="static/js/script.js"></script>
 </body>
 </html>

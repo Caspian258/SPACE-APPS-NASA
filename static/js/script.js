@@ -19,13 +19,8 @@ let populationLayer = null;
 let moonAngle = 0;
 let moonOrbitRadius = 2;
 let moonOrbitSpeed = 0.01;
-let previousMouseX = 0;
-let previousMouseY = 0
-let avDragging = false;
-let avPreviousMouseX = 0;
-let avPreviousMouseY = 0;
-let avRotSpeed = 0.01;
 let orbitControls = null;
+
 // UI
 const diameterInput = document.getElementById('diameter'); 
 const velocityInput = document.getElementById('velocity');
@@ -41,10 +36,26 @@ const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
 
 
+
+const loadNeoBtn = document.getElementById('loadNeoBtn');
+const neoPicker = document.getElementById('neoPicker');
+const neoSelect = document.getElementById('neoSelect');
+const neoDetails = document.getElementById('neoDetails');
+const applyNeo = document.getElementById('applyNeo');
+const closeNeo = document.getElementById('closeNeo');
+const neoStart = document.getElementById('neoStart');
+const neoEnd = document.getElementById('neoEnd');
+const neoMinDiameter = document.getElementById('neoMinDiameter');
+const neoHistoryEl = document.getElementById('neoHistory');
+const neoMinVel = document.getElementById('neoMinVel');
+const neoMaxVel = document.getElementById('neoMaxVel');
+const neoSearch = document.getElementById('neoSearch');
+
+
 // Vistas
 const show3D = document.getElementById('show3D');
 const show2D = document.getElementById('show2D');
-const globe3D = document.getElementById('globe3D');
+
 const map2D = document.getElementById('map2D');
 const objectSelect = document.getElementById('objectSelect');
 const objectSummary = document.getElementById('objectSummary');
@@ -74,6 +85,9 @@ const manRotationValue = document.getElementById('manRotationValue');
 const apiAsteroidSelect = document.getElementById('apiAsteroidSelect');
 const apiAsteroidDetails = document.getElementById('apiAsteroidDetails');
 const asteroidCanvas = document.getElementById('asteroidCanvas');
+
+
+
 
 // Mostrar valores de sliders
 function updateSliderDisplays() {
@@ -138,130 +152,309 @@ fetch('static/data/population_density.json').then(r=>r.json()).then(pop=>{
 show3D.addEventListener('click', () => { globe3D.classList.remove('hidden'); map2D.classList.add('hidden'); onResize(); });
 show2D.addEventListener('click', () => { map2D.classList.remove('hidden'); globe3D.classList.add('hidden'); map.invalidateSize(); });
 
-// Three.js (UMD) expone window.THREE cuando se carga desde <script>
+// --- Variables globales ---
 const THREE_NS = window.THREE;
-let renderer, scene, camera, earthMesh, asteroidMesh, trajectoryLine, starSphere, moonMesh, sunLight, earthGroup;
+let renderer, scene, camera;
+let earthMesh, moonMesh, sunMesh, starSphere;
+let earthGroup, sunGroup, sunLight;
 let isDragging = false;
 
-function initThree() {
-  if (!THREE_NS) {
-    globe3D.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
-    return;
-  }
+let rotVelX = 0, rotVelY = 0; 
+const rotationDamping = 0.95; 
+const rotationSpeedFactor = 0.005; 
+// Contenedor para el Sol
+let sunAngle = 0; 
+const sunOrbitRadius = 5; 
+const sunOrbitSpeed = 0.002; 
+let isPaused = false;
 
-  // --- Configuración básica ---
-  const width = globe3D.clientWidth || 600;
-  const height = globe3D.clientHeight || 400;
 
-  renderer = new THREE_NS.WebGLRenderer({ antialias: true });
-  renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE_NS.PCFSoftShadowMap;
-  globe3D.innerHTML = '';
-  globe3D.appendChild(renderer.domElement);
+// Variable para controlar el seguimiento de la Tierra
+let isFollowingEarth = false; 
 
-  scene = new THREE_NS.Scene();
+// Contenedor del DOM (USANDO NOMBRE ALTERNATIVO: threeContainer)
+const threeContainer = document.getElementById('globe3D') || { 
+    clientWidth: 600, 
+    clientHeight: 400, 
+    innerHTML: '', 
+    appendChild: () => {} 
+};
 
-  // --- Cámara ---
-  camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 2000);
-  camera.position.set(0, 0, 6);
-  scene.add(camera);
+// --- Función genérica para crear planetas ---
+function createPlanet({
+    name,
+    texturePath,
+    radius = 1,
+    segments = 64,
+    shininess = 5,
+    specular = 0x333333,
+    transparent = false,
+    opacity = 1,
+    emissive = 0x000000
+}) {
+    const textureLoader = new THREE_NS.TextureLoader();
+    const texture = textureLoader.load(
+        texturePath,
+        () => console.log(`🪐 Textura de ${name} cargada`),
+        undefined,
+        (err) => console.warn(`⚠️ Error al cargar textura de ${name}:`, err)
+    );
 
-  // --- Luces ---
-  scene.add(new THREE_NS.AmbientLight(0x333333, 0.3));
-  
-  sunLight = new THREE_NS.DirectionalLight(0xffffff, 1.5);
-  sunLight.position.set(5, 3, 5);
-  sunLight.castShadow = true;
-  sunLight.shadow.mapSize.width = 2048;
-  sunLight.shadow.mapSize.height = 2048;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 80;
-  scene.add(sunLight);
+    // MeshPhongMaterial es esencial para que la luz y las sombras funcionen.
+    const material = new THREE_NS.MeshPhongMaterial({
+        map: texture,
+        shininess,
+        specular,
+        transparent,
+        opacity,
+        emissive
+    });
+    
+    const mesh = new THREE_NS.Mesh(
+        new THREE_NS.SphereGeometry(radius, segments, segments),
+        material
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
 
-  // --- Fondo envolvente de estrellas ---
-  const textureLoader = new THREE_NS.TextureLoader();
-  const starTexture = textureLoader.load(
-    'static/textures/nocheHD.jpg',
-    () => console.log('✨ Fondo de estrellas cargado'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar fondo de estrellas:', err)
-  );
-
-  const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
-  const starMaterial = new THREE_NS.MeshBasicMaterial({
-    map: starTexture,
-    side: THREE_NS.BackSide,
-  });
-  starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
-  scene.add(starSphere);
-
-  // --- Grupo contenedor para Tierra y Luna (permite rotarlos juntos) ---
-  earthGroup = new THREE_NS.Group();
-  earthGroup.rotation.z = -0.3; // Inclinación de la Tierra
-  scene.add(earthGroup);
-
-  // --- Geometría y textura de la Tierra ---
-  const earthTexture = textureLoader.load(
-    'static/textures/planeta.jpg',
-    () => console.log('🌍 Textura de la Tierra cargada'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar textura de la Tierra:', err)
-  );
-
-  const earthMaterial = new THREE_NS.MeshPhongMaterial({
-    map: earthTexture,
-    shininess: 5,
-    specular: 0x333333,
-  });
-  earthMesh = new THREE_NS.Mesh(
-    new THREE_NS.SphereGeometry(1, 64, 64),
-    earthMaterial
-  );
-  earthMesh.castShadow = true;
-  earthMesh.receiveShadow = true;
-  earthGroup.add(earthMesh); // Añadir al grupo en lugar de la escena
-
-  // --- Capa de nubes opcional ---
-  const cloudsTexture = textureLoader.load(
-    'static/textures/fair_clouds_4k.png',
-    () => console.log('☁️ Nubes cargadas'),
-    undefined,
-    () => console.warn('⚠️ No se cargaron las nubes (no pasa nada)')
-  );
-
-  const cloudsMaterial = new THREE_NS.MeshLambertMaterial({
-    map: cloudsTexture,
-    transparent: true,
-    opacity: 0.4,
-  });
-
-  const cloudsMesh = new THREE_NS.Mesh(
-    new THREE_NS.SphereGeometry(1.01, 64, 64),
-    cloudsMaterial
-  );
-  earthMesh.add(cloudsMesh);
-
-  // --- Luna ---
-  const moonGeometry = new THREE_NS.SphereGeometry(0.27, 32, 32);
-  const moonMaterial = new THREE_NS.MeshPhongMaterial({
-    map: textureLoader.load('static/textures/luna.jpg'),
-    shininess: 5,
-    specular: 0x111111,
-  });
-  moonMesh = new THREE_NS.Mesh(moonGeometry, moonMaterial);
-  moonMesh.position.set(2, 0.5, 0);
-  moonMesh.castShadow = true;
-  moonMesh.receiveShadow = true;
-  earthMesh.add(moonMesh); // Ahora la Luna es hija de la Tierra
-
-  add3DControls();
-  animate();
+    return mesh;
 }
 
+// --- Inicialización principal ---
+function initThree() {
+    if (!THREE_NS) {
+        threeContainer.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
+        return;
+    }
+
+    // --- Configuración básica del render ---
+    const width = threeContainer.clientWidth || 600;
+    const height = threeContainer.clientHeight || 400;
+
+    renderer = new THREE_NS.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE_NS.PCFSoftShadowMap;
+    threeContainer.innerHTML = '';
+    threeContainer.appendChild(renderer.domElement);
+
+    scene = new THREE_NS.Scene();
+
+    // --- Cámara ---
+    camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 2000);
+    camera.position.set(0, 0, 15); 
+    scene.add(camera);
+
+    // --- Fondo estelar ---
+    const textureLoader = new THREE_NS.TextureLoader();
+    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', () => console.log('✨ Fondo de estrellas cargado'), undefined, (err) => console.warn('⚠️ Error al cargar fondo estelar:', err));
+    const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
+    const starMaterial = new THREE_NS.MeshBasicMaterial({
+        map: starTexture,
+        side: THREE_NS.BackSide
+    });
+    starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
+    scene.add(starSphere);
+
+    // --- Grupo para el Sol ---
+    sunGroup = new THREE_NS.Group();
+    scene.add(sunGroup);
+
+    // Sol (Mallado visual. Usa MeshBasicMaterial para auto-iluminarse)
+    // --- Sol (auto-iluminado) ---
+    sunMesh = new THREE_NS.Mesh(
+        new THREE_NS.SphereGeometry(1.5, 64, 64),
+        new THREE_NS.MeshBasicMaterial({
+            map: textureLoader.load('static/textures/sol.jpg')
+        })
+    );
+    sunMesh.position.set(0, 0, 0);
+    sunGroup.add(sunMesh);
+
+    // --- Luz del Sol para planetas ---
+    sunLight = new THREE_NS.PointLight(0xffffff, 2, 0); // luz puntual infinita
+    sunLight.position.set(0, 0, 0); // centro del sol
+    sunLight.castShadow = true;
+    scene.add(sunLight);
+
+    // AJUSTES CLAVE DE SOMBRA
+    sunLight.shadow.mapSize.width = 4096; 
+    sunLight.shadow.mapSize.height = 4096;
+
+    // Ajuste del frustum para cubrir la órbita de la Tierra
+    const d = 8; 
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 20; 
+    sunLight.shadow.bias = -0.0001; 
+
+    sunGroup.add(sunLight);
+
+    // --- Grupo para la Tierra ---
+    earthGroup = new THREE_NS.Group();
+    earthGroup.position.set(sunOrbitRadius, 0, 0); 
+    sunGroup.add(earthGroup);
+
+    // Tierra
+    earthMesh = createPlanet({
+        name: 'Tierra',
+        radius: 0.7,
+        texturePath: 'static/textures/planeta.jpg'
+    });
+    earthGroup.add(earthMesh);
+
+    // Nubes
+    const cloudsMesh = createPlanet({
+        name: 'Nubes',
+        texturePath: 'static/textures/fair_clouds_4k.png',
+        radius: 0.71,
+        shininess: 0,
+        specular: 0,
+        transparent: true,
+        opacity: 0.4
+    });
+    cloudsMesh.castShadow = false; 
+    cloudsMesh.receiveShadow = false;
+    earthMesh.add(cloudsMesh);
+
+    // Luna
+    moonMesh = createPlanet({
+        name: 'Luna',
+        texturePath: 'static/textures/luna.jpg',
+        radius: 0.27,
+        segments: 32,
+        shininess: 5,
+        specular: 0x111111
+    });
+    moonMesh.position.set(moonOrbitRadius, 0.5, 0);
+    earthMesh.add(moonMesh);
+
+    // --- Luz ambiental general ---
+    scene.add(new THREE_NS.AmbientLight(0x888888, 1.5)); 
+
+    // --- Controles 3D y animación ---
+    add3DControls(); 
+    setupFollowButton(); // Configura el botón de seguimiento
+    animate();
+}
+
+// --- Controles de mouse/arrastre ---
+function add3DControls() {
+    let prevMouseX = 0, prevMouseY = 0;
+
+    threeContainer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+        isFollowingEarth = false; // Detener seguimiento al intentar arrastrar
+        const button = document.getElementById('followEarthButton');
+        if (button) button.textContent = 'Centrar en Tierra 🌍';
+    });
+
+    threeContainer.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const deltaX = e.clientX - prevMouseX;
+        const deltaY = e.clientY - prevMouseY;
+
+        rotVelY = deltaX * rotationSpeedFactor; 
+        rotVelX = deltaY * rotationSpeedFactor;
+
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    window.addEventListener('resize', () => {
+        const w = threeContainer.clientWidth || 600;
+        const h = threeContainer.clientHeight || 400;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+    });
+}
+
+// --- Configuración del botón de seguimiento ---
+function setupFollowButton() {
+    const button = document.createElement('button');
+    button.textContent = 'Centrar en Tierra 🌍';
+    button.id = 'followEarthButton';
+    
+    // Estilo CSS básico para que no estorbe (Añadido al body)
+    button.style.position = 'absolute';
+    button.style.bottom = '10px';
+    button.style.left = '10px';
+    button.style.padding = '8px 15px';
+    button.style.zIndex = '1000';
+    button.style.backgroundColor = 'rgba(60, 179, 113, 0.8)';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+
+    document.body.appendChild(button);
+
+    button.addEventListener('click', () => {
+        isFollowingEarth = !isFollowingEarth;
+        if (isFollowingEarth) {
+            button.textContent = 'Dejar de Seguir';
+            // Al iniciar el seguimiento, establecemos una posición de cámara inicial
+            camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
+            
+        } else {
+            button.textContent = 'Centrar en Tierra 🌍';
+            // Volvemos a la vista general
+            camera.position.set(0, 0, 15);
+            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
+        }
+    });
+}
+
+
+// --- Animación ---
 function animate() {
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
+    if (isPaused) {
+        renderer.render(scene, camera);
+        return;
+    }
+
+
+    // 🌕 Revolución de la Luna
+    moonAngle += moonOrbitSpeed;
+    moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
+    moonMesh.position.z = Math.sin(moonAngle) * moonOrbitRadius;
+    moonMesh.position.y = Math.sin(moonAngle) * 0.2; 
+    
+    // 🌍 Revolución de la Tierra alrededor del Sol
+    sunAngle += sunOrbitSpeed;
+    sunGroup.rotation.y = sunAngle; 
+    
+    // 🔄 LÓGICA DE ROTACIÓN MANUAL/AUTOMÁTICA DE LA TIERRA
+    if (isDragging) {
+        earthGroup.rotation.x += rotVelX;
+        earthGroup.rotation.y += rotVelY;
+        
+    } else {
+        earthGroup.rotation.x += rotVelX;
+        earthGroup.rotation.y += rotVelY;
+        
+        // Desaceleración
+        rotVelX *= rotationDamping; 
+        rotVelY *= rotationDamping;
+        
+        // Rotación automática 
+        if (Math.abs(rotVelY) < 0.0001) {
+             earthGroup.rotation.y += 0.001; 
+        }
+    }
 
   if (orbitControls && typeof orbitControls.update === 'function') {
     orbitControls.update();
@@ -274,16 +467,41 @@ function animate() {
   // Inclinación orbital de la Luna (aproximadamente 5 grados)
   moonMesh.position.y = Math.sin(moonAngle) * 0.2;
 
-  // Rotación automática suave cuando no se está arrastrando
-  if (!isDragging) {
-    earthGroup.rotation.y += 0.001;
-    // Rotación muy lenta del cielo
-    starSphere.rotation.y += 0.0001;
-  }
 
-  renderer.render(scene, camera);
+    // 🚀 LÓGICA DE SEGUIMIENTO DE LA TIERRA
+    if (isFollowingEarth) {
+        // Obtenemos la posición global de la Tierra
+        const earthPosition = new THREE_NS.Vector3();
+        earthGroup.getWorldPosition(earthPosition);
+
+        // Definimos un punto de vista relativo a la Tierra (ej: 4 unidades detrás)
+        const relativeOffset = new THREE_NS.Vector3(0, 1, 4); 
+        
+        // Creamos una matriz de transformación a partir de la rotación del grupo Sol
+        const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
+
+        // Aplicamos la rotación orbital del sol (que contiene a la tierra) al offset
+        relativeOffset.applyMatrix4(matrix); 
+        
+        // Posicionamos la cámara: Posición de la Tierra + Offset rotado
+        camera.position.copy(earthPosition).add(relativeOffset);
+        
+        // Apuntamos la cámara a la Tierra
+        camera.lookAt(earthPosition);
+    }
+    
+    // 🌌 Movimiento lento del fondo
+    starSphere.rotation.y += 0.00005;
+
+    // ☀️ Rotación lenta del Sol (decorativo)
+    if (sunMesh) {
+        sunMesh.rotation.y += 0.0005;
+    }
+
+    renderer.render(scene, camera);
 }
 
+// Simulación Choque asteroide
 function latLonToVector3(lat, lon, radius = 1) {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
@@ -473,6 +691,7 @@ function onResize() {
 window.addEventListener('resize', onResize);
 initThree();
 
+// ============== Visor de Asteroides ==============
 // Estado del visor
 let viewerMode = 'manual'; // 'manual' | 'api'
 
@@ -1006,7 +1225,6 @@ function createMeteoriteMesh(diameterKm, seed) {
   const offsetY = random() * 100;
   const offsetZ = random() * 100;
 
-  // Aplicar ruido para la forma irregular (mantener esto)
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i);
     const y = positions.getY(i);
@@ -1030,19 +1248,11 @@ function createMeteoriteMesh(diameterKm, seed) {
   }
 
   geometry.computeVertexNormals();
-  
-  const textureLoader = new THREE_NS.TextureLoader();
-  const asteroidTexture = textureLoader.load(
-    'static/textures/asteroide.jpg',
-    () => console.log('🪨 Textura de asteroide cargada'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar textura de asteroide:', err)
-  );
-  
+  const texture = createProceduralTexture(seed, { offsetX, offsetY, offsetZ });
   const material = new THREE_NS.MeshPhongMaterial({
-    map: asteroidTexture,  // Textura fija
-    shininess: 10,
-    specular: 0x222222,
+    map: texture,
+    shininess: 5,
+    specular: 0x111111,
     flatShading: false
   });
 
@@ -1093,7 +1303,6 @@ function initAsteroidViewerThree() {
     asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
   }
-  
   const width = asteroidCanvas.clientWidth;
   const height = asteroidCanvas.clientHeight;
   avRenderer = new THREE_NS.WebGLRenderer({ antialias: true });
@@ -1103,30 +1312,9 @@ function initAsteroidViewerThree() {
   asteroidCanvas.appendChild(avRenderer.domElement);
 
   avScene = new THREE_NS.Scene();
-
   avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
   avCamera.position.set(0, 0, 3);
-  avScene.add(avCamera);
 
-  // Fondo de estrellas
-  const textureLoader = new THREE_NS.TextureLoader();
-  const starTexture = textureLoader.load(
-    'static/textures/nocheHD.jpg',
-    () => console.log('✨ Fondo de estrellas cargado'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar fondo de estrellas:', err)
-  );
-
-  const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
-  const starMaterial = new THREE_NS.MeshBasicMaterial({
-    map: starTexture,
-    side: THREE_NS.BackSide,
-  });
-  starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
-  avScene.add(starSphere);
-
-  
-  // Luces (mantener)
   const ambient = new THREE_NS.AmbientLight(0xffffff, 0.3);
   avScene.add(ambient);
 
@@ -1142,108 +1330,35 @@ function initAsteroidViewerThree() {
   rimLight.position.set(-2, 1, -3);
   avScene.add(rimLight);
 
-  const texturLoader = new THREE_NS.TextureLoader();
-  const asteroidTexture = texturLoader.load(
-    'static/textures/asteroide.jpg',
-    () => console.log('🪨 Textura de asteroide cargada'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar textura de asteroide:', err)
-  );
-
-  const asteroidGeometry = new THREE_NS.SphereGeometry(1, 64, 64);
-  const asteroidMaterial = new THREE_NS.MeshPhongMaterial({
-    map: asteroidTexture,
-    shininess: 5,
-    specular: 0x333333,
-  });
-  avAsteroid = new THREE_NS.Mesh(asteroidGeometry, asteroidMaterial);
-  avAsteroid.castShadow = true;
-  avAsteroid.receiveShadow = true;
-  avScene.add(avAsteroid);
+  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed: meteoriteState.seed });
+  updateViewerRotationSpeed();
 
   addAsteroidViewerControls();
   requestAnimationFrame(asteroidViewerAnimate);
 }
 
-let avAutoRotate = true; // rad/frame
+let avRotSpeed = 0.01; // rad/frame
 function asteroidViewerAnimate() {
   requestAnimationFrame(asteroidViewerAnimate);
-
-  // Rotación automática cuando no se está arrastrando
-  if (!avDragging && avAutoRotate) {
-    if (avAsteroid) {
-      avAsteroid.rotation.y += avRotSpeed;
-    }
-    // El cielo también rota automáticamente a la misma velocidad
-    if (starSphere) {
-      starSphere.rotation.y += avRotSpeed;
-    }
+  if (avAsteroid) {
+    avAsteroid.rotation.y += avRotSpeed;
   }
-
-  if (avRenderer && avScene && avCamera) {
-    avRenderer.render(avScene, avCamera);
-  }
+  if (avRenderer && avScene && avCamera) avRenderer.render(avScene, avCamera);
 }
 
 function addAsteroidViewerControls() {
   if (!avRenderer) return;
-  const domElement = avRenderer.domElement;
-  
-  // Controles de rotación con mouse (igual que en la Tierra)
-  domElement.addEventListener('mousedown', (event) => {
-    avDragging = true;
-    avPreviousMouseX = event.clientX;
-    avPreviousMouseY = event.clientY;
-    domElement.style.cursor = 'grabbing';
+  const el = avRenderer.domElement;
+  let dragging = false, lastX = 0, lastY = 0;
+  el.style.cursor = 'grab';
+  el.addEventListener('pointerdown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; el.style.cursor = 'grabbing'; });
+  window.addEventListener('pointermove', (e)=>{
+    if (!dragging || !avAsteroid) return;
+    const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+    avAsteroid.rotation.y += dx * 0.01; avAsteroid.rotation.x += dy * 0.01; lastX = e.clientX; lastY = e.clientY;
   });
-
-  domElement.addEventListener('mousemove', (event) => {
-  if (!avDragging) return;
-  
-  const deltaX = event.clientX - avPreviousMouseX;
-  const deltaY = event.clientY - avPreviousMouseY;
-  
-  // Rotar el asteroide
-  if (avAsteroid) {
-    avAsteroid.rotation.y += deltaX * 0.01;
-    avAsteroid.rotation.x += deltaY * 0.01;
-  }
-  
-  // Rotar el cielo en la misma dirección y proporción que el asteroide
-  // Esto crea la sensación de que estás moviendo tu perspectiva alrededor del objeto
-  if (starSphere) {
-    starSphere.rotation.y += deltaX * 0.01;  // Misma velocidad que el asteroide
-    starSphere.rotation.x += deltaY * 0.01;  // Misma velocidad que el asteroide
-  }
-  
-  avPreviousMouseX = event.clientX;
-  avPreviousMouseY = event.clientY;
-  });
-
-  domElement.addEventListener('mouseup', () => {
-    avDragging = false;
-    domElement.style.cursor = 'grab';
-  });
-
-  domElement.addEventListener('mouseleave', () => {
-    avDragging = false;
-    domElement.style.cursor = 'grab';
-  });
-
-  // Controles de zoom con la rueda del mouse (igual que en la Tierra)
-  domElement.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    
-    // Calcular la dirección del zoom
-    const zoomSpeed = 0.1;
-    const zoomDirection = event.deltaY > 0 ? -1 : 1;
-    
-    // Aplicar zoom moviendo la cámara
-    avCamera.position.z += zoomDirection * zoomSpeed;
-    
-    // Limitar el rango de zoom para evitar extremos
-    avCamera.position.z = Math.max(1.5, Math.min(15, avCamera.position.z));
-  });
+  window.addEventListener('pointerup', ()=>{ dragging = false; el.style.cursor = 'grab'; });
+  el.addEventListener('wheel', (e)=>{ e.preventDefault(); const d = Math.sign(e.deltaY); avCamera.position.z = Math.max(1.5, Math.min(6, avCamera.position.z + d*0.2)); }, { passive: false });
 }
 
 function updateManualDisplay() {
