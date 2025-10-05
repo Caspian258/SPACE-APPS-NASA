@@ -20,6 +20,10 @@ let moonAngle = 0;
 let moonOrbitRadius = 2;
 let moonOrbitSpeed = 0.01;
 let orbitControls = null;
+let avDragging = false;
+let avPreviousMouseX = 0;
+let avPreviousMouseY = 0;
+let avRotSpeed = 0.01;
 
 // UI
 const diameterInput = document.getElementById('diameter'); 
@@ -34,6 +38,8 @@ const energyOut = document.getElementById('energy');
 const craterOut = document.getElementById('crater');
 const magnitudeOut = document.getElementById('magnitude');
 const impactCoords = document.getElementById('impactCoords');
+const probabilityDebugOut = document.getElementById('probability-result');
+const calculateProbBtn = document.getElementById('calculate-prob-btn');
 
 
 
@@ -95,8 +101,15 @@ function updateSliderDisplays() {
   velocityValue.textContent = `${Number(velocityInput.value).toFixed(1)} km/s`;
   mitigationValue.textContent = `${Number(mitigationInput.value).toFixed(3)} km/s`;
 }
-[diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
+[diameterInput, velocityInput, mitigationInput].forEach(el => el && el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
+
+if (calculateProbBtn) {
+  calculateProbBtn.addEventListener('click', () => {
+    const selectedObject = getCurrentSelectedItem();
+    computeAndDisplayImpactProbability(selectedObject, { source: 'button' });
+  });
+}
 
 // Leaflet: mapa de selección (pequeño)
 const selectionMap = L.map('selectMap', {
@@ -179,8 +192,7 @@ const threeContainer = document.getElementById('globe3D') || {
     innerHTML: '', 
     appendChild: () => {} 
 };
-
-// --- Función genérica para crear planetas ---
+// --- Función genérica para crear planetas -__
 function createPlanet({
     name,
     texturePath,
@@ -248,7 +260,11 @@ function initThree() {
 
     // --- Fondo estelar ---
     const textureLoader = new THREE_NS.TextureLoader();
-    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', () => console.log('✨ Fondo de estrellas cargado'), undefined, (err) => console.warn('⚠️ Error al cargar fondo estelar:', err));
+    const starTexture = textureLoader.load('static/textures/nocheHD.jpg', 
+        () => console.log('✨ Fondo de estrellas cargado'),
+        undefined, 
+        (err) => console.warn('⚠️ Error al cargar fondo estelar:', err)
+    );
     const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
     const starMaterial = new THREE_NS.MeshBasicMaterial({
         map: starTexture,
@@ -257,32 +273,38 @@ function initThree() {
     starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
     scene.add(starSphere);
 
+    // --- Grupo principal del sistema solar ---
+    solarSystemGroup = new THREE_NS.Group();
+    scene.add(solarSystemGroup);
+
     // --- Grupo para el Sol ---
     sunGroup = new THREE_NS.Group();
-    scene.add(sunGroup);
+    solarSystemGroup.add(sunGroup);
 
-    // Sol (Mallado visual. Usa MeshBasicMaterial para auto-iluminarse)
-    sunMesh = new THREE_NS.Mesh(
-        new THREE_NS.SphereGeometry(1.5, 64, 64),
-        new THREE_NS.MeshBasicMaterial({
-            map: textureLoader.load('static/textures/sol.jpg'),
-            emissive: 0xffaa00, // Color de emisión
-            emissiveIntensity: 2 // Intensidad para que brille
-        })
+    // ☀️ Sol (emite luz propia)
+    const sunGeometry = new THREE_NS.SphereGeometry(1.5, 64, 64);
+    const sunTexture = new THREE_NS.TextureLoader().load(
+        'static/textures/sol.jpg',
+        () => console.log('🪐 Textura de Sol cargada'),
+        undefined,
+        (err) => console.warn('⚠️ Error al cargar textura del Sol:', err)
     );
-    sunMesh.position.set(0,0,0);
+    const sunMaterial = new THREE_NS.MeshBasicMaterial({
+        map: sunTexture,
+        toneMapped: false
+    });
+    sunMesh = new THREE_NS.Mesh(sunGeometry, sunMaterial);
+    sunMesh.position.set(0, 0, 0);
     sunGroup.add(sunMesh);
 
-    // LUZ DEL SOL: DirectionalLight (Solución para la iluminación) ☀️
-    sunLight = new THREE_NS.DirectionalLight(0xffffff, 15); 
-    sunLight.position.set(0, 0, 0); 
+    // 💡 Luz solar que ilumina la Tierra
+    sunLight = new THREE_NS.PointLight(0xffffff, 1.6, 100);
+    sunLight.position.set(0, 0, 0);
     sunLight.castShadow = true;
+    sunGroup.add(sunLight);
 
-    // AJUSTES CLAVE DE SOMBRA
     sunLight.shadow.mapSize.width = 4096; 
     sunLight.shadow.mapSize.height = 4096;
-
-    // Ajuste del frustum para cubrir la órbita de la Tierra
     const d = 8; 
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
@@ -292,14 +314,12 @@ function initThree() {
     sunLight.shadow.camera.far = 20; 
     sunLight.shadow.bias = -0.0001; 
 
-    sunGroup.add(sunLight);
-
     // --- Grupo para la Tierra ---
     earthGroup = new THREE_NS.Group();
     earthGroup.position.set(sunOrbitRadius, 0, 0); 
     sunGroup.add(earthGroup);
 
-    // Tierra
+    // 🌍 Tierra
     earthMesh = createPlanet({
         name: 'Tierra',
         radius: 0.7,
@@ -307,7 +327,7 @@ function initThree() {
     });
     earthGroup.add(earthMesh);
 
-    // Nubes
+    // ☁️ Nubes
     const cloudsMesh = createPlanet({
         name: 'Nubes',
         texturePath: 'static/textures/fair_clouds_4k.png',
@@ -321,7 +341,7 @@ function initThree() {
     cloudsMesh.receiveShadow = false;
     earthMesh.add(cloudsMesh);
 
-    // Luna
+    // 🌕 Luna
     moonMesh = createPlanet({
         name: 'Luna',
         texturePath: 'static/textures/luna.jpg',
@@ -333,61 +353,28 @@ function initThree() {
     moonMesh.position.set(moonOrbitRadius, 0.5, 0);
     earthMesh.add(moonMesh);
 
-    // --- Luz ambiental general ---
+    // --- Luz ambiental ---
     scene.add(new THREE_NS.AmbientLight(0x888888, 1.5)); 
 
-    // --- Controles 3D y animación ---
+    // --- Ajuste inicial de la vista ---
+    solarSystemGroup.rotation.x = 0.3;
+    solarSystemGroup.rotation.y = 0.8;
+
+    // --- Controles y animación ---
     add3DControls(); 
-    setupFollowButton(); // Configura el botón de seguimiento
+    setupFollowButton();
+    setupResetSystemButton();
     animate();
 }
 
-// --- Controles de mouse/arrastre ---
-function add3DControls() {
-    let prevMouseX = 0, prevMouseY = 0;
 
-    threeContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-        isFollowingEarth = false; // Detener seguimiento al intentar arrastrar
-        const button = document.getElementById('followEarthButton');
-        if (button) button.textContent = 'Centrar en Tierra 🌍';
-    });
 
-    threeContainer.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - prevMouseX;
-        const deltaY = e.clientY - prevMouseY;
-
-        rotVelY = deltaX * rotationSpeedFactor; 
-        rotVelX = deltaY * rotationSpeedFactor;
-
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-
-    window.addEventListener('resize', () => {
-        const w = threeContainer.clientWidth || 600;
-        const h = threeContainer.clientHeight || 400;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
-    });
-}
-
-// --- Configuración del botón de seguimiento ---
+// --- Botón de seguimiento ---
 function setupFollowButton() {
     const button = document.createElement('button');
     button.textContent = 'Centrar en Tierra 🌍';
     button.id = 'followEarthButton';
     
-    // Estilo CSS básico para que no estorbe (Añadido al body)
     button.style.position = 'absolute';
     button.style.bottom = '10px';
     button.style.left = '10px';
@@ -405,15 +392,85 @@ function setupFollowButton() {
         isFollowingEarth = !isFollowingEarth;
         if (isFollowingEarth) {
             button.textContent = 'Dejar de Seguir';
-            // Al iniciar el seguimiento, establecemos una posición de cámara inicial
             camera.position.set(sunOrbitRadius * 1.5, 0, sunOrbitRadius * 0.5); 
-            
         } else {
             button.textContent = 'Centrar en Tierra 🌍';
-            // Volvemos a la vista general
             camera.position.set(0, 0, 15);
             camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
         }
+    });
+}
+
+// --- Botón para reiniciar el Sistema Solar ---
+function setupResetSystemButton() {
+    const button = document.createElement('button');
+    button.textContent = 'Reiniciar Sistema Solar 🔄';
+    button.id = 'resetSystemButton';
+
+    // Estilo (junto al botón de seguir Tierra)
+    button.style.position = 'absolute';
+    button.style.bottom = '10px';
+    button.style.left = '180px';
+    button.style.padding = '8px 15px';
+    button.style.zIndex = '1000';
+    button.style.backgroundColor = 'rgba(70, 130, 180, 0.8)';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+
+    document.body.appendChild(button);
+
+    button.addEventListener('click', () => {
+        if (!solarSystemGroup) return;
+
+        // 🔄 Reiniciar el sistema solar completo
+        solarSystemGroup.rotation.set(0, 0, 0);
+
+        // 🔄 Reiniciar variables globales de movimiento
+        sunAngle = 0;
+        moonAngle = 0;
+        rotVelX = 0;
+        rotVelY = 0;
+
+        // 🔄 Reiniciar también la rotación local de la Tierra
+        if (earthGroup) {
+            earthGroup.rotation.set(0, 0, 0);
+        }
+
+        // 🔄 Reiniciar la posición de la Luna (por seguridad)
+        if (moonMesh) {
+            moonMesh.position.set(moonOrbitRadius, 0.5, 0);
+        }
+
+        // Si estamos siguiendo la Tierra 🌍
+        if (isFollowingEarth) {
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Dejar de Seguir';
+
+            // Mantener cámara centrada en la Tierra
+            const earthPosition = new THREE_NS.Vector3();
+            earthGroup.getWorldPosition(earthPosition);
+
+            // Definir el punto relativo de cámara (1 unidad arriba y 4 atrás)
+            const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
+
+            // Calcular rotación actual del sistema solar
+            const matrix = new THREE_NS.Matrix4().extractRotation(solarSystemGroup.matrixWorld);
+            relativeOffset.applyMatrix4(matrix);
+
+            // Reposicionar la cámara manteniendo el enfoque
+            camera.position.copy(earthPosition).add(relativeOffset);
+            camera.lookAt(earthPosition);
+        } else {
+            // Si no estamos centrados en la Tierra, volver a vista general
+            const followButton = document.getElementById('followEarthButton');
+            if (followButton) followButton.textContent = 'Centrar en Tierra 🌍';
+            camera.position.set(0, 0, 15);
+            camera.lookAt(new THREE_NS.Vector3(0, 0, 0));
+        }
+
+        console.log('🌞 Sistema Solar y Tierra reiniciados.');
     });
 }
 
@@ -426,7 +483,6 @@ function animate() {
         return;
     }
 
-
     // 🌕 Revolución de la Luna
     moonAngle += moonOrbitSpeed;
     moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
@@ -437,66 +493,42 @@ function animate() {
     sunAngle += sunOrbitSpeed;
     sunGroup.rotation.y = sunAngle; 
     
-    // 🔄 LÓGICA DE ROTACIÓN MANUAL/AUTOMÁTICA DE LA TIERRA
+    // 🔄 Rotación manual/automática del sistema solar
     if (isDragging) {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
     } else {
-        earthGroup.rotation.x += rotVelX;
-        earthGroup.rotation.y += rotVelY;
-        
-        // Desaceleración
+        solarSystemGroup.rotation.x += rotVelX;
+        solarSystemGroup.rotation.y += rotVelY;
+
         rotVelX *= rotationDamping; 
         rotVelY *= rotationDamping;
-        
-        // Rotación automática 
+
         if (Math.abs(rotVelY) < 0.0001) {
-             earthGroup.rotation.y += 0.001; 
+            solarSystemGroup.rotation.y += 0.0005; 
         }
     }
 
-  if (orbitControls && typeof orbitControls.update === 'function') {
-    orbitControls.update();
-  }
+    if (orbitControls && typeof orbitControls.update === 'function') {
+        orbitControls.update();
+    }
 
-  // Revolución de la Luna alrededor de la Tierra
-  moonAngle += moonOrbitSpeed;
-  moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
-  moonMesh.position.z = Math.sin(moonAngle) * moonOrbitRadius;
-  // Inclinación orbital de la Luna (aproximadamente 5 grados)
-  moonMesh.position.y = Math.sin(moonAngle) * 0.2;
-
-
-    // 🚀 LÓGICA DE SEGUIMIENTO DE LA TIERRA
+    // 🚀 Seguimiento de la Tierra
     if (isFollowingEarth) {
-        // Obtenemos la posición global de la Tierra
         const earthPosition = new THREE_NS.Vector3();
         earthGroup.getWorldPosition(earthPosition);
-
-        // Definimos un punto de vista relativo a la Tierra (ej: 4 unidades detrás)
-        const relativeOffset = new THREE_NS.Vector3(0, 1, 4); 
-        
-        // Creamos una matriz de transformación a partir de la rotación del grupo Sol
+        const relativeOffset = new THREE_NS.Vector3(0, 1, 4);
         const matrix = new THREE_NS.Matrix4().extractRotation(sunGroup.matrixWorld);
-
-        // Aplicamos la rotación orbital del sol (que contiene a la tierra) al offset
-        relativeOffset.applyMatrix4(matrix); 
-        
-        // Posicionamos la cámara: Posición de la Tierra + Offset rotado
+        relativeOffset.applyMatrix4(matrix);
         camera.position.copy(earthPosition).add(relativeOffset);
-        
-        // Apuntamos la cámara a la Tierra
         camera.lookAt(earthPosition);
     }
-    
+
     // 🌌 Movimiento lento del fondo
     starSphere.rotation.y += 0.00005;
 
-    // ☀️ Rotación lenta del Sol (decorativo)
-    if (sunMesh) {
-        sunMesh.rotation.y += 0.0005;
-    }
+    // ☀️ Rotación del Sol
+    if (sunMesh) sunMesh.rotation.y += 0.0005;
 
     renderer.render(scene, camera);
 }
@@ -632,6 +664,7 @@ function impactFlash(positionVec3) {
 
 function add3DControls() {
   if (!THREE_NS || !renderer || !camera) return;
+
   const ControlsCtor = THREE_NS.OrbitControls;
   if (!ControlsCtor) {
     console.warn('OrbitControls no está disponible. Usando controles básicos.');
@@ -649,9 +682,18 @@ function add3DControls() {
       if (!isDragging) return;
       const deltaX = event.clientX - prevX;
       const deltaY = event.clientY - prevY;
-      earthGroup.rotation.y += deltaX * 0.01;
-      earthGroup.rotation.x += deltaY * 0.01;
-      starSphere.rotation.y -= deltaX * 0.002;
+
+      if (isFollowingEarth) {
+        // 🔹 Si estamos centrados en la Tierra, rotar solo la Tierra
+        earthGroup.rotation.y += deltaX * 0.01;
+        earthGroup.rotation.x += deltaY * 0.01;
+      } else {
+        // 🔹 Si no, rotar todo el sistema solar
+        solarSystemGroup.rotation.y += deltaX * 0.01;
+        solarSystemGroup.rotation.x += deltaY * 0.01;
+      }
+
+      starSphere.rotation.y -= deltaX * 0.002;        // efecto sutil en estrellas
       starSphere.rotation.x -= deltaY * 0.002;
       prevX = event.clientX;
       prevY = event.clientY;
@@ -682,6 +724,7 @@ function add3DControls() {
   orbitControls.addEventListener('start', () => { isDragging = true; });
   orbitControls.addEventListener('end', () => { isDragging = false; });
 }
+
 
 function onResize() {
   if (!renderer || !camera) return;
@@ -734,6 +777,205 @@ function hashStringToSeed(str) {
 function toNumber(value, fallback = NaN) {
   const parsed = typeof value === 'number' ? value : parseFloat(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function pickFiniteNumber(...values) {
+  for (const value of values) {
+    const numeric = toNumber(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+}
+
+function extractOrbitalParameters(item) {
+  if (!item) return { a: null, e: null, inc: null };
+  const raw = item.raw || {};
+  const a = pickFiniteNumber(raw.a, raw.semi_major_axis, raw.semiMajorAxis, item.a);
+  const e = pickFiniteNumber(raw.e, raw.eccentricity, item.e);
+  const inc = pickFiniteNumber(raw.i, raw.i_deg, raw.inclination, item.i);
+  return { a, e, inc };
+}
+
+// ========== FUNCIÓN DE PROBABILIDAD DE IMPACTO (MÉTODO DE ÖPIK) ==========
+function impactProbabilityAdvanced({
+  a, e, inc, at = 1.0, et = 0.0167,
+  Rt_km = 6371, Mt = 5.97219e24,
+  samples = 1000, useGravFocus = true,
+  GMsun = 1.32712440018e20, AU_m = 1.495978707e11
+} = {}) {
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) {
+    return { Pcoll: NaN, a, e, inc };
+  }
+
+  if (samples % 2 !== 0) samples++;
+  const i = inc * Math.PI / 180;
+  const Rt = Rt_km * 1000;
+  const G = 6.67430e-11;
+
+  function radiusRcoll(U, Ve) {
+    const ratio = Math.max(U, 1e-12);
+    return Rt * Math.sqrt(1 + (Ve * Ve) / (ratio * ratio));
+  }
+
+  function V_target_at_r(rho_AU) {
+    const r = rho_AU * AU_m;
+    const atSI = at * AU_m;
+    return Math.sqrt(Math.max(0, GMsun * (2 / r - 1 / atSI)));
+  }
+
+  function tisserand_rho(rho_AU) {
+    return (rho_AU / a) + 2 * Math.sqrt((a / rho_AU) * (1 - e * e)) * Math.cos(i);
+  }
+
+  const Ve = Math.sqrt(2 * G * Mt / Rt);
+
+  function integrand_nu(nu) {
+    const denom = 1 + et * Math.cos(nu);
+    if (Math.abs(denom) < 1e-12) return 0;
+    const rho = at * (1 - et * et) / denom;
+    const Vt = V_target_at_r(rho);
+    const T_r = tisserand_rho(rho);
+    const tmp = 3 - T_r;
+    if (tmp <= 0) return 0;
+    const U = Vt * Math.sqrt(tmp);
+    const Rcoll = useGravFocus ? radiusRcoll(U, Ve) : Rt;
+    const bracket = 2 - (rho / a) - (a / rho) * (1 - e * e);
+    if (bracket <= 0) return 0;
+    const prefactor = 1 / (4 * Math.PI * Math.sin(i));
+    const Rcoll_over_at_sq = (Rcoll / (at * AU_m)) ** 2;
+    const factor_speed = U * Math.sqrt(rho * AU_m) / Math.sqrt(GMsun * (1 - et * et));
+    const PE_single = prefactor * Rcoll_over_at_sq * factor_speed / Math.sqrt(bracket);
+    return 4 * PE_single;
+  }
+
+  const a_nu = 0;
+  const b_nu = Math.PI;
+  const n = samples;
+  const h = (b_nu - a_nu) / n;
+  let integral = 0;
+
+  for (let k = 0; k <= n; k++) {
+    const nu = a_nu + k * h;
+    const y = integrand_nu(nu);
+    if (k === 0 || k === n) integral += y;
+    else if (k % 2 === 1) integral += 4 * y;
+    else integral += 2 * y;
+  }
+
+  integral *= (h / 3);
+  const Pcoll = integral / Math.PI;
+
+  return { Pcoll, a, e, inc, at, et, Rt_km, Mt, useGravFocus, samples };
+}
+
+function computeImpactProbabilityValue(a, e, inc) {
+  if (typeof impactProbabilityAdvanced !== 'function') return null;
+  if (!Number.isFinite(a) || !Number.isFinite(e) || !Number.isFinite(inc)) return null;
+  try {
+    const result = impactProbabilityAdvanced({ a, e, inc });
+    if (result && typeof result === 'object') {
+      if (Number.isFinite(result.Pcoll)) return result.Pcoll;
+      if (Number.isFinite(result.pcoll)) return result.pcoll;
+    }
+    if (Number.isFinite(result)) return result;
+  } catch (error) {
+    console.error('Error calculando la probabilidad de impacto:', error);
+  }
+  return null;
+}
+
+function updateImpactProbabilityForItem(item, { source = 'update' } = {}) {
+  const { a, e, inc } = extractOrbitalParameters(item);
+  const probability = computeImpactProbabilityValue(a, e, inc);
+  outputProbabilityDebug(probability, source);
+}
+
+// Unifica mapeo -> cálculo -> visualización con logs
+function computeAndDisplayImpactProbability(selectedObject, opts = {}) {
+  const { source = 'handler' } = opts;
+  // 1. Verificar el objeto seleccionado
+  console.log(`[${source}] 1. Objeto seleccionado:`, selectedObject);
+  if (!selectedObject) {
+    outputProbabilityDebug(null, source);
+    return;
+  }
+
+  // 2. Mapear y convertir parámetros (a, e, inc)
+  const raw = selectedObject && selectedObject.raw ? selectedObject.raw : selectedObject;
+  const parseNum = (v) => {
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  let a = parseNum(raw.semi_major_axis);
+  if (isNaN(a)) a = parseNum(raw.a);
+  if (isNaN(a)) a = parseNum(selectedObject.a);
+  if (isNaN(a)) a = parseNum(raw.q_au_2);
+
+  let e = parseNum(raw.eccentricity);
+  if (isNaN(e)) e = parseNum(raw.e);
+  if (isNaN(e)) e = parseNum(selectedObject.e);
+
+  let inc = parseNum(raw.inclination);
+  if (isNaN(inc)) inc = parseNum(raw.i);
+  if (isNaN(inc)) inc = parseNum(raw.i_deg);
+  if (isNaN(inc)) inc = parseNum(selectedObject.i);
+
+  if ((isNaN(a) || a <= 0) && Number.isFinite(e)) {
+    const q = parseNum(raw.q_au_1);
+    if (Number.isFinite(q)) {
+      const denom = Math.max(1e-6, 1 - e);
+      a = q / denom;
+    }
+  }
+
+  const params = { a, e, inc };
+  console.log(`[${source}] 2. Parámetros para la función:`, params);
+
+  // 3. Calcular y registrar el resultado crudo
+  let result = null;
+  try {
+    result = impactProbabilityAdvanced(params);
+  } catch (err) {
+    console.error(`[${source}] Error llamando a impactProbabilityAdvanced:`, err);
+    result = null;
+  }
+
+  // 4. Mostrar el resultado en la UI
+  let valueToShow = null;
+  if (typeof result === 'number' && Number.isFinite(result)) {
+    valueToShow = result;
+  } else if (result && typeof result === 'object') {
+    const candidate = Number.isFinite(result?.Pcoll) ? result.Pcoll
+                    : Number.isFinite(result?.pcoll) ? result.pcoll
+                    : undefined;
+    if (Number.isFinite(candidate)) valueToShow = candidate;
+  }
+
+  outputProbabilityDebug(valueToShow, source);
+}
+
+function outputProbabilityDebug(probability, source = 'debug') {
+  const label = `[${source}] Debug - Probabilidad de Impacto (%):`;
+  if (Number.isFinite(probability)) {
+    const pct = probability;
+    const formatted = `${pct.toExponential(4)}%`;
+    if (probabilityDebugOut) probabilityDebugOut.textContent = formatted;
+    console.log(label, formatted);
+  } else {
+    if (probabilityDebugOut) probabilityDebugOut.textContent = '--';
+    console.log(label, '--');
+  }
+}
+
+function getCurrentSelectedItem() {
+  if (Number.isInteger(currentObjectIndex) && currentObjectIndex >= 0 && filteredCatalog[currentObjectIndex]) {
+    return filteredCatalog[currentObjectIndex];
+  }
+  if (objectSelect) {
+    const idx = Number(objectSelect.value);
+    if (Number.isFinite(idx) && filteredCatalog[idx]) return filteredCatalog[idx];
+  }
+  return null;
 }
 
 function rotationPeriodToViewerSpeed(rotationPeriodHours) {
@@ -948,7 +1190,7 @@ function applyObjectToViewer(objectData) {
   updateViewerRotationSpeed();
 }
 
-function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false } = {}) {
+function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false, updateProbability = true } = {}) {
   if (!Array.isArray(filteredCatalog) || !filteredCatalog[index]) return;
   currentObjectIndex = index;
   const selected = filteredCatalog[index];
@@ -964,6 +1206,9 @@ function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = f
   }
   if (updateDetails && apiAsteroidDetails) {
     apiAsteroidDetails.value = formatObjectDetails(selected);
+  }
+  if (updateProbability) {
+    updateImpactProbabilityForItem(selected, { source: 'active-object' });
   }
 }
 
@@ -1028,6 +1273,7 @@ function applyFilters({ preserveSelection = false } = {}) {
     currentObjectId = null;
     updateObjectSummary(null);
     if (apiAsteroidDetails) apiAsteroidDetails.value = 'No hay datos disponibles';
+    updateImpactProbabilityForItem(null, { source: 'filters' });
     return;
   }
 
@@ -1104,8 +1350,16 @@ async function switchDataset(key, { origin = 'main', forceReload = false } = {})
 if (objectSelect) {
   objectSelect.addEventListener('change', () => {
     if (suppressDatasetEvents) return;
-    const idx = Number(objectSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
+    const value = objectSelect.value;
+    const idx = Number(value);
+    if (!Number.isFinite(idx) || !filteredCatalog[idx]) {
+      updateImpactProbabilityForItem(null, { source: 'dropdown' });
+      return;
+    }
+
+    const selectedObject = filteredCatalog[idx];
+    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true, updateProbability: false });
+    computeAndDisplayImpactProbability(selectedObject, { source: 'dropdown' });
   });
 }
 
@@ -1303,6 +1557,7 @@ function initAsteroidViewerThree() {
     asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
   }
+
   const width = asteroidCanvas.clientWidth;
   const height = asteroidCanvas.clientHeight;
   avRenderer = new THREE_NS.WebGLRenderer({ antialias: true });
@@ -1312,9 +1567,29 @@ function initAsteroidViewerThree() {
   asteroidCanvas.appendChild(avRenderer.domElement);
 
   avScene = new THREE_NS.Scene();
-  avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
-  avCamera.position.set(0, 0, 3);
 
+  avCamera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 1000);
+  avCamera.position.set(0, 0, 3);
+  avScene.add(avCamera);
+
+  // Fondo de estrellas
+  const textureLoader = new THREE_NS.TextureLoader();
+  const starTexture = textureLoader.load(
+    'static/textures/nocheHD.jpg',
+    () => console.log('✨ Fondo de estrellas cargado'),
+    undefined,
+    (err) => console.warn('⚠️ Error al cargar fondo de estrellas:', err)
+  );
+
+  const starGeometry = new THREE_NS.SphereGeometry(900, 64, 64);
+  const starMaterial = new THREE_NS.MeshBasicMaterial({
+    map: starTexture,
+    side: THREE_NS.BackSide,
+  });
+  const starSphere = new THREE_NS.Mesh(starGeometry, starMaterial);
+  avScene.add(starSphere);
+
+  // Luces
   const ambient = new THREE_NS.AmbientLight(0xffffff, 0.3);
   avScene.add(ambient);
 
@@ -1330,36 +1605,193 @@ function initAsteroidViewerThree() {
   rimLight.position.set(-2, 1, -3);
   avScene.add(rimLight);
 
-  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed: meteoriteState.seed });
-  updateViewerRotationSpeed();
+  // Asteroide procedural con textura adaptada
+  function createAsteroidWithTexture(diameterKm, seed) {
+    const radius = diameterToSceneRadius(diameterKm);
+    const geometry = new THREE_NS.SphereGeometry(radius, 96, 96);
+    const positions = geometry.attributes.position;
+    const random = seededRandom(seed);
+    const offsetX = random() * 100;
+    const offsetY = random() * 100;
+    const offsetZ = random() * 100;
+
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const z = positions.getZ(i);
+
+      const noise1 = Math.sin((x + offsetX) * 1.5 + y * 0.8) * Math.cos(z * 1.2);
+      const noise2 = Math.sin(y * 1.8 + (z + offsetY) * 1.0) * Math.cos(x * 1.5);
+      const noise3 = Math.sin((z + offsetZ) * 1.3 + x * 1.1) * Math.cos(y * 1.6);
+      const combinedNoise = noise1 * 0.35 + noise2 * 0.35 + noise3 * 0.3;
+      const craterNoise = Math.sin(x * 3) * Math.sin(y * 3) * Math.sin(z * 3);
+      const displacement = combinedNoise * 0.25 + craterNoise * 0.1;
+
+      const length = Math.sqrt(x * x + y * y + z * z) || 1;
+      const scale = 1 + displacement;
+      positions.setXYZ(
+        i,
+        (x / length) * radius * scale,
+        (y / length) * radius * scale,
+        (z / length) * radius * scale
+      );
+    }
+
+    geometry.computeVertexNormals();
+
+    // Cargar textura y adaptarla a la superficie
+    const asteroidTexture = textureLoader.load(
+      'static/textures/asteroide.jpg',
+      () => {},
+      undefined,
+      (err) => console.warn('⚠️ Error al cargar textura de asteroide:', err)
+    );
+    asteroidTexture.wrapS = THREE_NS.RepeatWrapping;
+    asteroidTexture.wrapT = THREE_NS.RepeatWrapping;
+    asteroidTexture.anisotropy = 4;
+
+    const material = new THREE_NS.MeshPhongMaterial({
+      map: asteroidTexture,
+      shininess: 5,
+      specular: 0x333333,
+    });
+
+    const mesh = new THREE_NS.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  // Crear el asteroide inicial
+  avAsteroid = createAsteroidWithTexture(meteoriteState.diameterKM, meteoriteState.seed);
+  avScene.add(avAsteroid);
+
+  // Cuando se regenere el meteorito, reemplazar el mesh y mantener la textura pegada
+  window.regenerateMeteorite = function (overrides = {}) {
+    meteoriteState = {
+      diameterKM: overrides.diameterKM !== undefined ? Number(overrides.diameterKM) : meteoriteState.diameterKM,
+      seed: overrides.seed !== undefined ? Number(overrides.seed) : meteoriteState.seed
+    };
+    if (!avScene) return;
+    disposeMesh(avAsteroid);
+    avAsteroid = createAsteroidWithTexture(meteoriteState.diameterKM, meteoriteState.seed);
+    avScene.add(avAsteroid);
+    updateViewerRotationSpeed();
+  };
 
   addAsteroidViewerControls();
   requestAnimationFrame(asteroidViewerAnimate);
 }
 
-let avRotSpeed = 0.01; // rad/frame
-function asteroidViewerAnimate() {
-  requestAnimationFrame(asteroidViewerAnimate);
-  if (avAsteroid) {
-    avAsteroid.rotation.y += avRotSpeed;
-  }
-  if (avRenderer && avScene && avCamera) avRenderer.render(avScene, avCamera);
+function addAsteroidViewerControls() {
+    if (!avRenderer) return;
+    const domElement = avRenderer.domElement;
+    
+    // Variables para el control de órbita
+    let isRotating = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    
+    // Configuración de la órbita
+    const orbit = {
+        theta: 0,    // Ángulo horizontal
+        phi: Math.PI / 2, // Ángulo vertical (empezamos mirando de frente)
+        radius: 3,   // Distancia de la cámara al asteroide
+        minRadius: 1.5,
+        maxRadius: 15,
+        minPhi: 0.1,
+        maxPhi: Math.PI - 0.1
+    };
+    
+    // Función para actualizar la posición de la cámara
+    function updateCameraPosition() {
+        // Convertir coordenadas esféricas a cartesianas
+        const x = orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+        const y = orbit.radius * Math.cos(orbit.phi);
+        const z = orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+        
+        avCamera.position.set(x, y, z);
+        avCamera.lookAt(0, 0, 0); // Mirar al centro donde está el asteroide
+    }
+    
+    // Inicializar posición de la cámara
+    updateCameraPosition();
+    
+    // Eventos del mouse
+    domElement.addEventListener('mousedown', (event) => {
+        isRotating = true;
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+        domElement.style.cursor = 'grabbing';
+    });
+    
+    domElement.addEventListener('mousemove', (event) => {
+        if (!isRotating) return;
+        
+        const deltaX = event.clientX - previousMousePosition.x;
+        const deltaY = event.clientY - previousMousePosition.y;
+        
+        // Sensibilidad de rotación
+        const sensitivity = 0.01;
+        
+        // Actualizar ángulos de órbita
+        orbit.theta -= deltaX * sensitivity;
+        orbit.phi -= deltaY * sensitivity;
+        
+        // Limitar ángulo vertical para evitar volteretas
+        orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi));
+        
+        // Actualizar posición de la cámara
+        updateCameraPosition();
+        
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+    });
+    
+    domElement.addEventListener('mouseup', () => {
+        isRotating = false;
+        domElement.style.cursor = 'grab';
+    });
+    
+    domElement.addEventListener('mouseleave', () => {
+        isRotating = false;
+        domElement.style.cursor = 'grab';
+    });
+    
+    // Zoom con rueda del mouse
+    domElement.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        
+        const zoomSpeed = 0.1;
+        const zoomDirection = event.deltaY > 0 ? -1 : 1;
+        
+        orbit.radius += zoomDirection * zoomSpeed;
+        orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius));
+        
+        updateCameraPosition();
+    });
+    
+    // Configurar cursor inicial
+    domElement.style.cursor = 'grab';
 }
 
-function addAsteroidViewerControls() {
-  if (!avRenderer) return;
-  const el = avRenderer.domElement;
-  let dragging = false, lastX = 0, lastY = 0;
-  el.style.cursor = 'grab';
-  el.addEventListener('pointerdown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; el.style.cursor = 'grabbing'; });
-  window.addEventListener('pointermove', (e)=>{
-    if (!dragging || !avAsteroid) return;
-    const dx = e.clientX - lastX; const dy = e.clientY - lastY;
-    avAsteroid.rotation.y += dx * 0.01; avAsteroid.rotation.x += dy * 0.01; lastX = e.clientX; lastY = e.clientY;
-  });
-  window.addEventListener('pointerup', ()=>{ dragging = false; el.style.cursor = 'grab'; });
-  el.addEventListener('wheel', (e)=>{ e.preventDefault(); const d = Math.sign(e.deltaY); avCamera.position.z = Math.max(1.5, Math.min(6, avCamera.position.z + d*0.2)); }, { passive: false });
+let avAutoRotate = true; // rad/frame
+function asteroidViewerAnimate() {
+  requestAnimationFrame(asteroidViewerAnimate);
+
+  // Rotación automática cuando no se está arrastrando
+  if (!avDragging) {
+    if (avAsteroid) {
+      avAsteroid.rotation.y += avRotSpeed;
+    }
+    // Rotación muy lenta del cielo (como en la Tierra)
+    if (starSphere) {
+      starSphere.rotation.y += avRotSpeed * 0.1; // Más lento que el asteroide
+    }
+  }
+
+  if (avRenderer && avScene && avCamera) {
+    avRenderer.render(avScene, avCamera);
+  }
 }
+
 
 function updateManualDisplay() {
   if (manDiameter && manDiameterValue) {
@@ -1400,55 +1832,64 @@ if (manRotation) {
 }
 
 function populateApiSelect() {
-  if (!apiAsteroidSelect) return;
-  suppressDatasetEvents = true;
   apiAsteroidSelect.innerHTML = '';
-
-  if (!filteredCatalog.length) {
-    setSelectLoading(apiAsteroidSelect, 'Sin datos disponibles');
-    suppressDatasetEvents = false;
-    return;
-  }
-
-  filteredCatalog.forEach((item, idx) => {
+  mockAsteroidDatabase.forEach((a, idx) => {
     const opt = document.createElement('option');
     opt.value = String(idx);
-    const diameterLabel = Number.isFinite(item.diameterKm) ? `Ø ${item.diameterKm.toFixed(1)} km` : 'Ø N/D';
-    const speedValue = Number.isFinite(item.velocity) ? item.velocity : estimateViewerSpeed(item);
-    const speedLabel = Number.isFinite(speedValue) ? `v ${speedValue.toFixed(1)} km/s` : 'v N/D';
-    opt.textContent = `${item.name} — ${diameterLabel}, ${speedLabel}`;
+    opt.textContent = `${a.name} — Ø ${a.diameter} km, v ${a.velocity} km/s`;
     apiAsteroidSelect.appendChild(opt);
   });
-
-  apiAsteroidSelect.disabled = false;
-  suppressDatasetEvents = false;
+  updateApiDetails();
 }
 
 function updateApiDetails() {
   if (!apiAsteroidSelect || !apiAsteroidDetails) return;
   const idx = Number(apiAsteroidSelect.value || 0);
-  const objectData = filteredCatalog[idx];
-
-  if (!objectData) {
+  const asteroid = mockAsteroidDatabase[idx];
+  if (!asteroid) {
     apiAsteroidDetails.value = 'No hay datos disponibles';
     return;
   }
 
-  apiAsteroidDetails.value = formatObjectDetails(objectData);
-  setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: false });
+  const infoLines = [
+    `Nombre: ${asteroid.name}`,
+    `Diámetro: ${asteroid.diameter} km`,
+    `Velocidad: ${asteroid.velocity} km/s`,
+    `Densidad: ${asteroid.density} kg/m³`,
+    `Periodo de rotación: ${asteroid.rotation_period} h`,
+    `Semilla procedural: ${asteroid.seed}`
+  ];
+  apiAsteroidDetails.value = infoLines.join('\n');
+
+  if (manDiameter) {
+    const min = Number(manDiameter.min) || 0.1;
+    const max = Number(manDiameter.max) || 1000;
+    const diameter = Math.min(Math.max(Number(asteroid.diameter) || min, min), max);
+    manDiameter.value = diameter.toFixed(1);
+    meteoriteState.diameterKM = Number(manDiameter.value);
+  }
+
+  if (manSpeed) manSpeed.value = Number(asteroid.velocity).toFixed(1);
+  if (manDensity) manDensity.value = Math.round(Number(asteroid.density)).toString();
+
+  if (manRotation) {
+    const degPerSec = 360 / Math.max(1, Number(asteroid.rotation_period) * 3600);
+    const sliderValue = Math.min(Number(manRotation.max) || 30, Math.max(Number(manRotation.min) || 0, degPerSec * 100));
+    manRotation.value = sliderValue.toFixed(1);
+  }
+
+  updateManualDisplay();
+  updateViewerRotationSpeed();
+
+  const seed = Number.isFinite(asteroid.seed) ? Number(asteroid.seed) : densityToSeed(Number(manDensity.value));
+  meteoriteState.seed = seed;
+  regenerateMeteorite({ diameterKM: meteoriteState.diameterKM, seed });
 }
 
-if (apiAsteroidSelect) {
-  apiAsteroidSelect.addEventListener('change', () => {
-    if (suppressDatasetEvents) return;
-    const idx = Number(apiAsteroidSelect.value || 0);
-    setActiveObjectByIndex(idx, { updateViewer: true, updateDetails: true });
-  });
-}
+apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', updateApiDetails);
 
 function setViewerMode(mode) {
   viewerMode = mode;
-  updateDatasetRadios(currentDatasetKey);
   if (mode === 'manual') {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');

@@ -4,7 +4,6 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple
 header { padding: 12px 20px; background: #0f1a2b; border-bottom: 1px solid #25324a; }
 header h1 { margin: 0; font-size: 1.6rem; }
 header p { margin: 4px 0 0; color: #b9c4d2; }
-
 /* Botón imagen en esquina superior derecha */
 header { position: relative; }
 .icon-button { position: absolute; top: 18px; right: 28px; background: transparent; border: none; padding: 0; cursor: pointer; }
