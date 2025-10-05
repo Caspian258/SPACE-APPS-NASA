@@ -50,6 +50,9 @@ const show3D = document.getElementById('show3D');
 const show2D = document.getElementById('show2D');
 const globe3D = document.getElementById('globe3D');
 const map2D = document.getElementById('map2D');
+const dataSourceSelect = document.getElementById('dataSourceSelect');
+const objectSelect = document.getElementById('objectSelect');
+const objectSummary = document.getElementById('objectSummary');
 
 // Visor de Asteroides UI refs
 const simLayout = document.getElementById('simLayout');
@@ -61,12 +64,37 @@ const apiControls = document.getElementById('apiControls');
 const manSpeed = document.getElementById('manSpeed');
 const manDensity = document.getElementById('manDensity');
 const manRotation = document.getElementById('manRotation');
+const manDiameter = document.getElementById('manDiameter');
+const manDiameterValue = document.getElementById('manDiameterValue');
 const manSpeedValue = document.getElementById('manSpeedValue');
 const manDensityValue = document.getElementById('manDensityValue');
 const manRotationValue = document.getElementById('manRotationValue');
 const apiAsteroidSelect = document.getElementById('apiAsteroidSelect');
 const apiAsteroidDetails = document.getElementById('apiAsteroidDetails');
+const apiDataSourceSelect = document.getElementById('apiDataSourceSelect');
 const asteroidCanvas = document.getElementById('asteroidCanvas');
+
+// Catálogos disponibles
+const DATA_SOURCES = {
+  asteroids: {
+    key: 'asteroids',
+    label: 'Asteroides',
+    path: 'Database/Trials/BaseAsteroides.jsonl',
+    format: 'jsonl'
+  },
+  comets: {
+    key: 'comets',
+    label: 'Cometas',
+    path: 'Database/Trials/Comets.json',
+    format: 'json'
+  }
+};
+
+let currentDataSourceKey = 'asteroids';
+let catalog = [];
+let currentObjectIndex = null;
+let isCatalogLoading = false;
+let suppressSelectionEvents = false;
 
 // Mostrar valores de sliders
 function updateSliderDisplays() {
@@ -76,6 +104,328 @@ function updateSliderDisplays() {
 }
 [diameterInput, velocityInput, mitigationInput].forEach(el => el.addEventListener('input', updateSliderDisplays));
 updateSliderDisplays();
+
+function parseJsonl(text) {
+  return text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch (error) {
+        console.warn('Línea JSONL inválida omitida:', line);
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function hashStringToSeed(str) {
+  if (!str) return 101;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) % 1000;
+  }
+  return Math.max(1, hash);
+}
+
+function toNumber(value, fallback = NaN) {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeAsteroidRecord(record, index = 0) {
+  if (!record) return null;
+  const name = record.full_name || `Asteroide ${index + 1}`;
+  const a = toNumber(record.a);
+  const e = Math.min(0.999, Math.max(0, toNumber(record.e)));
+  const inclination = toNumber(record.i);
+  const ascendingNode = toNumber(record.om);
+  const argPeriapsis = toNumber(record.w);
+  const meanAnomaly = toNumber(record.ma);
+  const eccentricAnomaly = toNumber(record.E_deg);
+
+  const rawDiameter = toNumber(record.diameter);
+  const diameterKm = Number.isFinite(rawDiameter)
+    ? (rawDiameter > 50 ? rawDiameter / 1000 : rawDiameter)
+    : 1;
+
+  const density = 2500 + (hashStringToSeed(name) % 1500);
+  const rotation = 6 + ((hashStringToSeed(name) % 80) / 10);
+
+  return {
+    id: `ast-${index}`,
+    type: 'asteroid',
+    name,
+    diameterKm: Math.max(0.1, diameterKm),
+    density,
+    rotation_period: rotation,
+    seed: hashStringToSeed(name),
+    a,
+    e,
+    i: inclination,
+    omega: ascendingNode,
+    argPeriapsis,
+    meanAnomaly,
+    eccentricAnomaly,
+    raw: record
+  };
+}
+
+function normalizeCometRecord(record, index = 0) {
+  if (!record) return null;
+  const name = record.object_name || record.object || `Cometa ${index + 1}`;
+  const e = Math.min(0.999, Math.max(0, toNumber(record.e)));
+  const q = toNumber(record.q_au_1, 0.8);
+  const a = e >= 1 ? toNumber(record.q_au_2, q + 1) : q / Math.max(1e-3, 1 - e);
+  const inclination = toNumber(record.i_deg);
+  const ascendingNode = toNumber(record.node_deg);
+  const argPeriapsis = toNumber(record.w_deg);
+  const period = toNumber(record.p_yr, 10);
+
+  const moid = toNumber(record.moid_au, 0.05);
+  const diameterKm = Math.max(0.5, moid * 150);
+  const density = 600 + (hashStringToSeed(name) % 200);
+  const rotation = period > 0 ? Math.min(48, period * 2) : 12;
+
+  return {
+    id: `com-${index}`,
+    type: 'comet',
+    name,
+    diameterKm,
+    density,
+    rotation_period: rotation,
+    seed: hashStringToSeed(name),
+    a,
+    e,
+    i: inclination,
+    omega: ascendingNode,
+    argPeriapsis,
+    meanAnomaly: 0,
+    eccentricAnomaly: null,
+    raw: record
+  };
+}
+
+function getNormalizerForSource(key) {
+  return key === 'comets' ? normalizeCometRecord : normalizeAsteroidRecord;
+}
+
+function updateDataSourceSelectors(key) {
+  if (dataSourceSelect && dataSourceSelect.value !== key) {
+    dataSourceSelect.value = key;
+  }
+  if (apiDataSourceSelect && apiDataSourceSelect.value !== key) {
+    apiDataSourceSelect.value = key;
+  }
+}
+
+function setSelectLoading(selectEl, message) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  const option = document.createElement('option');
+  option.value = '';
+  option.textContent = message;
+  selectEl.appendChild(option);
+  selectEl.disabled = true;
+}
+
+function populateMainObjectSelect() {
+  if (!objectSelect) return;
+  objectSelect.innerHTML = '';
+  if (!catalog.length) {
+    setSelectLoading(objectSelect, 'Sin datos disponibles');
+    return;
+  }
+  catalog.forEach((item, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `${item.name}`;
+    objectSelect.appendChild(option);
+  });
+  objectSelect.disabled = false;
+  if (currentObjectIndex !== null && catalog[currentObjectIndex]) {
+    objectSelect.value = String(currentObjectIndex);
+  } else {
+    objectSelect.value = '0';
+    currentObjectIndex = 0;
+  }
+}
+
+function updateObjectSummary(objectData) {
+  if (!objectSummary) return;
+  if (!objectData) {
+    objectSummary.textContent = '--';
+    return;
+  }
+  const typeLabel = objectData.type === 'comet' ? 'Cometa' : 'Asteroide';
+  const diameter = objectData.diameterKm ? `${objectData.diameterKm.toFixed(1)} km` : 'N/D';
+  const eccentricity = Number.isFinite(objectData.e) ? objectData.e.toFixed(3) : 'N/D';
+  const semiMajor = Number.isFinite(objectData.a) ? `${objectData.a.toFixed(3)} UA` : 'N/D';
+  objectSummary.textContent = `${typeLabel} • Diámetro: ${diameter} • a: ${semiMajor} • e: ${eccentricity}`;
+}
+
+function populateApiSelect() {
+  if (!apiAsteroidSelect) return;
+  apiAsteroidSelect.innerHTML = '';
+  if (!catalog.length) {
+    setSelectLoading(apiAsteroidSelect, 'Sin datos disponibles');
+    if (apiAsteroidDetails) apiAsteroidDetails.value = '';
+    return;
+  }
+
+  catalog.forEach((item, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `${item.name}`;
+    apiAsteroidSelect.appendChild(option);
+  });
+  apiAsteroidSelect.disabled = false;
+  if (currentObjectIndex !== null && catalog[currentObjectIndex]) {
+    apiAsteroidSelect.value = String(currentObjectIndex);
+  } else {
+    apiAsteroidSelect.value = '0';
+  }
+}
+
+function rotationPeriodToViewerSpeed(rotationPeriodHours) {
+  const hours = toNumber(rotationPeriodHours, 6);
+  if (!Number.isFinite(hours) || hours <= 0) return 5;
+  const degPerSecond = 360 / (hours * 3600);
+  const amplified = degPerSecond * 1200; // acelera para visualización
+  return clampValue(amplified, 0.2, 25);
+}
+
+function estimateViewerSpeed(objectData) {
+  if (!objectData) return 10;
+  const raw = objectData.raw || {};
+  const directVelocity = toNumber(raw.velocity_kms) || toNumber(raw.velocity) || toNumber(raw.v_infinity);
+  if (Number.isFinite(directVelocity)) return clampValue(directVelocity, 0, 60);
+  return objectData.type === 'comet' ? 45 : 20;
+}
+
+function syncViewerControlsFromObject(objectData) {
+  if (!objectData) return;
+  const diameter = clampValue(toNumber(objectData.diameterKm, meteoriteState.diameterKM), Number(manDiameter?.min) || 0.1, Number(manDiameter?.max) || 1000);
+  const density = clampValue(Math.round(toNumber(objectData.density, meteoriteState.density)), Number(manDensity?.min) || 500, Number(manDensity?.max) || 8000);
+  const rotationVisual = rotationPeriodToViewerSpeed(objectData.rotation_period);
+  const speed = clampValue(estimateViewerSpeed(objectData), Number(manSpeed?.min) || 0, Number(manSpeed?.max) || 60);
+
+  if (manDiameter) manDiameter.value = diameter.toFixed(1);
+  if (manDensity) manDensity.value = String(Math.round(density));
+  if (manRotation) manRotation.value = rotationVisual.toFixed(1);
+  if (manSpeed) manSpeed.value = speed.toFixed(1);
+
+  meteoriteState.seed = objectData.seed || hashStringToSeed(objectData.name);
+}
+
+function formatObjectDetails(objectData) {
+  if (!objectData) return '';
+  const lines = [];
+  lines.push(`Nombre: ${objectData.name}`);
+  lines.push(`Tipo: ${objectData.type === 'comet' ? 'Cometa' : 'Asteroide'}`);
+  if (Number.isFinite(objectData.diameterKm)) lines.push(`Diámetro estimado: ${objectData.diameterKm.toFixed(2)} km`);
+  if (Number.isFinite(objectData.density)) lines.push(`Densidad modelo: ${Math.round(objectData.density)} kg/m³`);
+  if (Number.isFinite(objectData.a)) lines.push(`Semieje mayor (a): ${objectData.a.toFixed(3)} UA`);
+  if (Number.isFinite(objectData.e)) lines.push(`Excentricidad (e): ${objectData.e.toFixed(3)}`);
+  if (Number.isFinite(objectData.i)) lines.push(`Inclinación (i): ${objectData.i.toFixed(2)}°`);
+  if (Number.isFinite(objectData.omega)) lines.push(`Nodo ascendente (Ω): ${objectData.omega.toFixed(2)}°`);
+  if (Number.isFinite(objectData.argPeriapsis)) lines.push(`Arg. del perihelio (ω): ${objectData.argPeriapsis.toFixed(2)}°`);
+  if (Number.isFinite(objectData.rotation_period)) lines.push(`Periodo de rotación (aprox.): ${objectData.rotation_period.toFixed(1)} h`);
+  const period = toNumber(objectData.raw?.p_yr);
+  if (Number.isFinite(period)) lines.push(`Período orbital: ${period.toFixed(2)} años`);
+  return lines.join('\n');
+}
+
+async function switchDataSource(key, { origin = 'main', forceReload = false } = {}) {
+  if (!DATA_SOURCES[key]) return;
+  if (isCatalogLoading) return;
+  updateDataSourceSelectors(key);
+
+  if (!forceReload && currentDataSourceKey === key && catalog.length) {
+    populateMainObjectSelect();
+    populateApiSelect();
+    if (catalog[currentObjectIndex || 0]) {
+      updateObjectSummary(catalog[currentObjectIndex || 0]);
+    }
+    return;
+  }
+
+  currentDataSourceKey = key;
+  isCatalogLoading = true;
+  setSelectLoading(objectSelect, 'Cargando catálogo...');
+  setSelectLoading(apiAsteroidSelect, 'Cargando catálogo...');
+  if (apiAsteroidDetails) apiAsteroidDetails.value = '';
+
+  const source = DATA_SOURCES[key];
+  try {
+    const response = await fetch(source.path);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    let rawData;
+    if (source.format === 'jsonl') {
+      const text = await response.text();
+      rawData = parseJsonl(text);
+    } else {
+      rawData = await response.json();
+    }
+    const normalizer = getNormalizerForSource(key);
+    catalog = (rawData || [])
+      .map((record, index) => normalizer(record, index))
+      .filter(Boolean);
+    currentObjectIndex = catalog.length ? 0 : null;
+  } catch (error) {
+    console.error('No se pudo cargar el catálogo:', error);
+    catalog = [];
+    currentObjectIndex = null;
+  } finally {
+    isCatalogLoading = false;
+  }
+
+  populateMainObjectSelect();
+  populateApiSelect();
+  if (catalog.length) {
+    suppressSelectionEvents = true;
+    if (objectSelect) objectSelect.value = String(currentObjectIndex);
+    if (apiAsteroidSelect) apiAsteroidSelect.value = String(currentObjectIndex);
+    suppressSelectionEvents = false;
+    setActiveObjectByIndex(currentObjectIndex, { updateViewer: true, updateDetails: true });
+  } else {
+    updateObjectSummary(null);
+  }
+}
+
+function setActiveObjectByIndex(index, { updateViewer = false, updateDetails = false } = {}) {
+  if (!Array.isArray(catalog) || !catalog[index]) return;
+  currentObjectIndex = index;
+  const selected = catalog[index];
+  updateObjectSummary(selected);
+  updateSpaceObject(selected);
+
+  if (updateViewer) {
+    applyObjectToViewer(selected);
+  }
+  if (updateDetails) {
+    updateApiDetails();
+  }
+}
+
+function applyObjectToViewer(objectData) {
+  if (!objectData) return;
+  syncViewerControlsFromObject(objectData);
+  updateManualDisplay();
+  applyManualTo3D();
+
+  if (apiAsteroidSelect && catalog[currentObjectIndex || 0]) {
+    suppressSelectionEvents = true;
+    apiAsteroidSelect.value = String(currentObjectIndex);
+    suppressSelectionEvents = false;
+  }
+
+  if (viewerMode === 'api') {
+    updateApiDetails();
+  }
+}
 
 // Leaflet: mapa de selección (pequeño)
 const selectionMap = L.map('selectMap', {
@@ -142,9 +492,116 @@ show2D.addEventListener('click', () => { map2D.classList.remove('hidden'); globe
 
 // Three.js (UMD) expone window.THREE cuando se carga desde <script>
 const THREE_NS = window.THREE;
-let renderer, scene, camera, earthMesh, asteroidMesh, trajectoryLine;
+let renderer, scene, camera;
+let earthMesh, earthCloudsMesh;
+let asteroidMesh, trajectoryLine;
+let orbitControls = null;
+let sunLight = null;
+let sunMesh = null;
+let spaceObjectMesh = null;
+let spaceOrbitLine = null;
+let spaceOrbitPoints = null;
+let spaceOrbitProgress = 0;
 let isDragging = false;
 let rotVelX = 0, rotVelY = 0;
+
+let avRenderer, avScene, avCamera, avAsteroid, avLight;
+let avRotSpeed = 0.01;
+
+function clampValue(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return min;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function createSeededRandom(seed) {
+  let value = Math.floor(seed || 1) % 2147483647;
+  if (value <= 0) value += 2147483646;
+  return () => {
+    value = (value * 16807) % 2147483647;
+    return (value - 1) / 2147483646;
+  };
+}
+
+function diameterKmToSceneRadius(diameterKm) {
+  const km = Number.isFinite(diameterKm) && diameterKm > 0 ? diameterKm : 1;
+  const log = Math.log10(Math.max(1, km));
+  return 0.02 + Math.min(0.3, Math.max(0, log * 0.02));
+}
+
+function densityToSeed(density) {
+  const val = Number.isFinite(density) ? density : 3000;
+  const normalized = (val - 500) / (8000 - 500);
+  return Math.floor(clampValue(normalized, 0, 1) * 1000) + 1;
+}
+
+function createMeteoriteMesh(diameterKm = 1, seed = 1) {
+  if (!THREE_NS) return null;
+  const random = createSeededRandom(seed);
+  const radius = diameterKmToSceneRadius(diameterKm);
+  const geometry = new THREE_NS.IcosahedronGeometry(radius, 4);
+  const position = geometry.attributes.position;
+  const vertex = new THREE_NS.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    vertex.fromBufferAttribute(position, i);
+    const noise = (random() - 0.5) * 0.4;
+    const stretch = 1 + noise;
+    vertex.multiplyScalar(stretch);
+    position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+  }
+  geometry.computeVertexNormals();
+  const material = new THREE_NS.MeshStandardMaterial({
+    color: 0xff8c00,
+    roughness: 0.92,
+    metalness: 0.08
+  });
+  const mesh = new THREE_NS.Mesh(geometry, material);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+function disposeMesh(mesh) {
+  if (!mesh) return;
+  if (mesh.parent) mesh.parent.remove(mesh);
+  if (mesh.geometry) mesh.geometry.dispose();
+  if (Array.isArray(mesh.material)) {
+    mesh.material.forEach(mat => mat && mat.dispose && mat.dispose());
+  } else if (mesh.material && mesh.material.dispose) {
+    mesh.material.dispose();
+  }
+}
+
+const meteoriteState = {
+  diameterKM: toNumber(manDiameter?.value, 50),
+  density: toNumber(manDensity?.value, 3000),
+  rotationDegPerSec: toNumber(manRotation?.value, 5),
+  seed: densityToSeed(toNumber(manDensity?.value, 3000))
+};
+
+function regenerateMeteorite({ diameterKM, density, seed, rotationDegPerSec } = {}) {
+  if (Number.isFinite(diameterKM)) meteoriteState.diameterKM = diameterKM;
+  if (Number.isFinite(density)) meteoriteState.density = density;
+  if (Number.isFinite(seed)) meteoriteState.seed = seed;
+  if (Number.isFinite(rotationDegPerSec)) meteoriteState.rotationDegPerSec = rotationDegPerSec;
+
+  if (!avScene) return;
+  if (avAsteroid) {
+    disposeMesh(avAsteroid);
+    avAsteroid = null;
+  }
+  const mesh = createMeteoriteMesh(meteoriteState.diameterKM, meteoriteState.seed);
+  if (mesh) {
+    avAsteroid = mesh;
+    avAsteroid.rotation.x = 0.3;
+    avAsteroid.rotation.y = 0;
+    avScene.add(avAsteroid);
+  }
+}
+
+const AU_TO_SCENE_UNITS = 1.3;
+const ORBIT_POINT_COUNT = 512;
+const ORBIT_SPEED = 0.12;
 
 function initThree() {
   if (!THREE_NS) {
@@ -152,100 +609,93 @@ function initThree() {
     return;
   }
 
-  // --- Configuración básica ---
-  const width = globe3D.clientWidth || 600;
-  const height = globe3D.clientHeight || 400;
+  const width = Math.max(1, globe3D.clientWidth || 640);
+  const height = Math.max(1, globe3D.clientHeight || 420);
 
   renderer = new THREE_NS.WebGLRenderer({ antialias: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x05070f, 1);
   globe3D.innerHTML = '';
   globe3D.appendChild(renderer.domElement);
 
   scene = new THREE_NS.Scene();
+  scene.background = new THREE_NS.Color(0x05070f);
 
-  // Cámara
-  camera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 1000);
-  camera.position.set(0, 0, 3.5);
+  camera = new THREE_NS.PerspectiveCamera(50, width / height, 0.1, 200);
+  camera.position.set(0, 1.2, 5.2);
   scene.add(camera);
 
-  // Luces
-  const ambient = new THREE_NS.AmbientLight(0x888888);
+  if (THREE_NS.OrbitControls) {
+    orbitControls = new THREE_NS.OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.05;
+    orbitControls.enablePan = true;
+    orbitControls.minDistance = 1.8;
+    orbitControls.maxDistance = 12;
+    orbitControls.target.set(0, 0, 0);
+    orbitControls.addEventListener('start', () => { isDragging = true; });
+    orbitControls.addEventListener('end', () => { isDragging = false; });
+  } else {
+    console.warn('OrbitControls no está disponible, usando controles básicos.');
+    add3DControls();
+  }
+
+  const ambient = new THREE_NS.AmbientLight(0x334466, 0.6);
   scene.add(ambient);
 
-  const dirLight = new THREE_NS.DirectionalLight(0xffffff, 1.0);
-  dirLight.position.set(5, 3, 5);
-  scene.add(dirLight);
+  sunLight = new THREE_NS.PointLight(0xfff2cc, 2.2, 0, 2);
+  sunLight.position.set(5, 3.5, 4.5);
+  scene.add(sunLight);
 
-  // --- Geometría de la Tierra ---
-  const geometry = new THREE_NS.SphereGeometry(1, 64, 64);
-  const texLoader = new THREE_NS.TextureLoader();
-
-  // Textura principal
-  const earthTexture = texLoader.load('static/textures/earth_texture.jpg',
-    () => console.log('🌍 Textura cargada correctamente'),
-    undefined,
-    (err) => console.warn('⚠️ Error al cargar la textura:', err)
+  sunMesh = new THREE_NS.Mesh(
+    new THREE_NS.SphereGeometry(0.35, 32, 32),
+    new THREE_NS.MeshStandardMaterial({ color: 0x111111, emissive: 0xffdd55, emissiveIntensity: 1.6 })
   );
+  sunMesh.position.copy(sunLight.position.clone().setLength(6));
+  scene.add(sunMesh);
 
-  // Material base (si no carga, se ve azul)
-  const material = new THREE_NS.MeshPhongMaterial({
-    map: earthTexture,
-    color: earthTexture ? 0xffffff : 0x1e90ff,
-    shininess: 10,
+  const texLoader = new THREE_NS.TextureLoader();
+  const earthTexture = texLoader.load('static/textures/earth_texture.jpg', undefined, undefined, () => {
+    console.warn('⚠️ No se pudo cargar la textura de la Tierra, usando color sólido.');
   });
 
-  earthMesh = new THREE_NS.Mesh(geometry, material);
+  const earthMaterial = new THREE_NS.MeshPhongMaterial({
+    map: earthTexture,
+    color: 0xffffff,
+    shininess: 10
+  });
+
+  earthMesh = new THREE_NS.Mesh(new THREE_NS.SphereGeometry(1, 64, 64), earthMaterial);
   scene.add(earthMesh);
 
-  // --- Nubes opcionales ---
-  const cloudsTexture = texLoader.load('static/textures/fair_clouds_4k.png',
-    () => console.log('☁️ Nubes cargadas'),
-    undefined,
-    () => console.warn('⚠️ No se cargaron las nubes (no pasa nada)')
-  );
+  const cloudsTexture = texLoader.load('static/textures/fair_clouds_4k.png', undefined, undefined, () => {});
+  const cloudsMaterial = new THREE_NS.MeshLambertMaterial({ map: cloudsTexture, transparent: true, opacity: 0.35 });
+  earthCloudsMesh = new THREE_NS.Mesh(new THREE_NS.SphereGeometry(1.01, 64, 64), cloudsMaterial);
+  earthMesh.add(earthCloudsMesh);
 
-  const cloudsMaterial = new THREE_NS.MeshLambertMaterial({
-    map: cloudsTexture,
-    transparent: true,
-    opacity: 0.4,
-  });
-
-  const cloudsMesh = new THREE_NS.Mesh(
-    new THREE_NS.SphereGeometry(1.01, 64, 64),
-    cloudsMaterial
-  );
-  earthMesh.add(cloudsMesh);
-
-  // --- Animación ---
-  function animate() {
-    requestAnimationFrame(animate);
-    if (earthMesh) earthMesh.rotation.y += 0.0008;
-    if (cloudsMesh) cloudsMesh.rotation.y += 0.001;
-    renderer.render(scene, camera);
-  }
   animate();
-
-  add3DControls();
 }
 
 function animate() {
   requestAnimationFrame(animate);
-  if (earthMesh) {
-    if (!isDragging) {
-      const speed = Math.abs(rotVelX) + Math.abs(rotVelY);
-      if (speed > 1e-4) {
-        earthMesh.rotation.x += rotVelX;
-        earthMesh.rotation.y += rotVelY;
-        const maxTilt = Math.PI / 2 - 0.01;
-        earthMesh.rotation.x = Math.max(-maxTilt, Math.min(maxTilt, earthMesh.rotation.x));
-        const damping = 0.95; rotVelX *= damping; rotVelY *= damping;
-      } else {
-        earthMesh.rotation.y += 0.0008;
-      }
-    }
+  if (!earthMesh || !renderer || !scene || !camera) return;
+
+  if (!isDragging) {
+    earthMesh.rotation.y += 0.0006;
+    if (earthCloudsMesh) earthCloudsMesh.rotation.y += 0.0009;
   }
-  if (renderer && scene && camera) renderer.render(scene, camera);
+
+  if (spaceObjectMesh && spaceOrbitPoints && spaceOrbitPoints.length > 1) {
+    spaceOrbitProgress = (spaceOrbitProgress + ORBIT_SPEED) % spaceOrbitPoints.length;
+    const currentIndex = Math.floor(spaceOrbitProgress);
+    const nextIndex = (currentIndex + 1) % spaceOrbitPoints.length;
+    const t = spaceOrbitProgress - currentIndex;
+    spaceObjectMesh.position.lerpVectors(spaceOrbitPoints[currentIndex], spaceOrbitPoints[nextIndex], t);
+  }
+
+  if (orbitControls) orbitControls.update();
+  renderer.render(scene, camera);
 }
 
 function latLonToVector3(lat, lon, radius = 1) {
@@ -255,6 +705,141 @@ function latLonToVector3(lat, lon, radius = 1) {
   const z = radius * Math.sin(phi) * Math.sin(theta);
   const y = radius * Math.cos(phi);
   return new THREE_NS.Vector3(x, y, z);
+}
+
+function degreesToRadians(deg) {
+  return (deg || 0) * Math.PI / 180;
+}
+
+function normalizeAngle(angle) {
+  const twoPi = Math.PI * 2;
+  return ((angle % twoPi) + twoPi) % twoPi;
+}
+
+function solveKeplerEquation(meanAnomalyRad, eccentricity) {
+  let E = eccentricity < 0.8 ? meanAnomalyRad : Math.PI;
+  for (let iter = 0; iter < 20; iter++) {
+    const f = E - eccentricity * Math.sin(E) - meanAnomalyRad;
+    const fPrime = 1 - eccentricity * Math.cos(E);
+    const delta = f / fPrime;
+    E -= delta;
+    if (Math.abs(delta) < 1e-8) break;
+  }
+  return E;
+}
+
+function meanAnomalyToTrueAnomaly(meanAnomalyDeg, eccentricity) {
+  const meanAnomalyRad = degreesToRadians(meanAnomalyDeg || 0);
+  const E = solveKeplerEquation(meanAnomalyRad, eccentricity);
+  const cosE = Math.cos(E);
+  const sinE = Math.sin(E);
+  const factor = Math.sqrt(1 - eccentricity * eccentricity);
+  const sinV = (factor * sinE) / (1 - eccentricity * cosE);
+  const cosV = (cosE - eccentricity) / (1 - eccentricity * cosE);
+  return normalizeAngle(Math.atan2(sinV, cosV));
+}
+
+function calculateOrbitPoints(elements, segments = ORBIT_POINT_COUNT) {
+  if (!THREE_NS) return null;
+  const semiMajor = Number.isFinite(elements.a) ? elements.a : 1;
+  const eccentricity = Math.min(0.995, Math.max(0, elements.e || 0));
+  const inclination = degreesToRadians(elements.i || 0);
+  const ascendingNode = degreesToRadians(elements.omega || 0);
+  const periapsisArg = degreesToRadians(elements.argPeriapsis || 0);
+
+  const cosO = Math.cos(ascendingNode);
+  const sinO = Math.sin(ascendingNode);
+  const cosw = Math.cos(periapsisArg);
+  const sinw = Math.sin(periapsisArg);
+  const cosi = Math.cos(inclination);
+  const sini = Math.sin(inclination);
+
+  const aScene = semiMajor * AU_TO_SCENE_UNITS;
+  const sqrtOneMinusESquared = Math.sqrt(Math.max(0, 1 - eccentricity * eccentricity));
+
+  const points = [];
+  const trueAnomalies = [];
+
+  for (let k = 0; k < segments; k++) {
+    const E = (k / segments) * Math.PI * 2;
+    const cosE = Math.cos(E);
+    const sinE = Math.sin(E);
+
+    const xPerifocal = aScene * (cosE - eccentricity);
+    const yPerifocal = aScene * sqrtOneMinusESquared * sinE;
+
+    const trueAnomaly = normalizeAngle(
+      2 * Math.atan2(Math.sqrt(1 + eccentricity) * Math.sin(E / 2), Math.sqrt(1 - eccentricity) * Math.cos(E / 2))
+    );
+
+    const x = (cosO * cosw - sinO * sinw * cosi) * xPerifocal + (-cosO * sinw - sinO * cosw * cosi) * yPerifocal;
+    const y = (sinO * cosw + cosO * sinw * cosi) * xPerifocal + (-sinO * sinw + cosO * cosw * cosi) * yPerifocal;
+    const z = (sinw * sini) * xPerifocal + (cosw * sini) * yPerifocal;
+
+    points.push(new THREE_NS.Vector3(x, y, z));
+    trueAnomalies.push(trueAnomaly);
+  }
+
+  return { points, trueAnomalies };
+}
+
+function disposeSpaceObject() {
+  if (spaceOrbitLine) {
+    scene.remove(spaceOrbitLine);
+    spaceOrbitLine.geometry.dispose();
+    spaceOrbitLine.material.dispose();
+    spaceOrbitLine = null;
+  }
+  if (spaceObjectMesh) {
+    scene.remove(spaceObjectMesh);
+    disposeMesh(spaceObjectMesh);
+    spaceObjectMesh = null;
+  }
+  spaceOrbitPoints = null;
+  spaceOrbitProgress = 0;
+}
+
+function updateSpaceObject(objectData) {
+  if (!scene || !objectData) return;
+  disposeSpaceObject();
+
+  const orbitData = calculateOrbitPoints(objectData);
+  if (!orbitData || !orbitData.points.length) {
+    console.warn('No se pudo generar la órbita para el objeto seleccionado.');
+    return;
+  }
+
+  spaceOrbitPoints = orbitData.points;
+  const orbitGeometry = new THREE_NS.BufferGeometry().setFromPoints(spaceOrbitPoints);
+  const orbitMaterial = new THREE_NS.LineBasicMaterial({ color: objectData.type === 'comet' ? 0xffa347 : 0x6bc3ff, linewidth: 1 });
+  spaceOrbitLine = new THREE_NS.LineLoop(orbitGeometry, orbitMaterial);
+  scene.add(spaceOrbitLine);
+
+  spaceObjectMesh = createMeteoriteMesh(objectData.diameterKm, objectData.seed);
+  if (spaceObjectMesh) {
+    spaceObjectMesh.material.color = new THREE_NS.Color(objectData.type === 'comet' ? 0xffaa55 : 0xff8c00);
+    scene.add(spaceObjectMesh);
+  }
+
+  let initialIndex = 0;
+  if (Array.isArray(orbitData.trueAnomalies) && orbitData.trueAnomalies.length) {
+    const ecc = Math.min(0.995, Math.max(0, objectData.e || 0));
+    const targetTrueAnomaly = meanAnomalyToTrueAnomaly(objectData.meanAnomaly || 0, ecc);
+    let minDelta = Infinity;
+    orbitData.trueAnomalies.forEach((value, idx) => {
+      const diff = Math.abs(value - targetTrueAnomaly);
+      const wrapped = Math.min(diff, Math.PI * 2 - diff);
+      if (wrapped < minDelta) {
+        minDelta = wrapped;
+        initialIndex = idx;
+      }
+    });
+  }
+
+  spaceOrbitProgress = initialIndex;
+  if (spaceObjectMesh) {
+    spaceObjectMesh.position.copy(spaceOrbitPoints[initialIndex]);
+  }
 }
 
 // TODO: Modelo matemático principal de simulación
@@ -359,6 +944,27 @@ closeNeo.addEventListener('click', () => neoPicker.classList.add('hidden'));
   if (cachedNEOs.length) applyNeoFilters();
 }));
 
+dataSourceSelect && dataSourceSelect.addEventListener('change', (event) => {
+  if (suppressSelectionEvents) return;
+  const key = event.target.value;
+  switchDataSource(key, { origin: 'main' });
+});
+
+objectSelect && objectSelect.addEventListener('change', (event) => {
+  if (suppressSelectionEvents) return;
+  const index = Number(event.target.value);
+  if (!Number.isInteger(index)) return;
+  setActiveObjectByIndex(index, { updateViewer: true, updateDetails: true });
+  suppressSelectionEvents = true;
+  if (apiAsteroidSelect) apiAsteroidSelect.value = event.target.value;
+  suppressSelectionEvents = false;
+});
+
+apiDataSourceSelect && apiDataSourceSelect.addEventListener('change', (event) => {
+  if (suppressSelectionEvents) return;
+  switchDataSource(event.target.value, { origin: 'api' });
+});
+
 // Dibujo de zonas
 function drawEffectZones(lat, lon, craterKm, zones) {
   effectLayers.forEach(l => map.removeLayer(l));
@@ -460,132 +1066,144 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 initThree();
+switchDataSource('asteroids', { forceReload: true }).catch(()=>{});
 
 // ============== Visor de Asteroides ==============
-// Estado del visor
 let viewerMode = 'manual'; // 'manual' | 'api'
-
-// TODO: Reemplazar esta lista con los datos de la API real.
-const mockAsteroids = [
-  { name: "Ceres-M", diameter: 940, velocity: 17.9, density: 2162, rotation_period: 9.1 },
-  { name: "Pallas-M", diameter: 512, velocity: 16.5, density: 2800, rotation_period: 7.8 },
-  { name: "Vesta-M", diameter: 525, velocity: 19.3, density: 3420, rotation_period: 5.3 },
-  { name: "Hygiea-M", diameter: 434, velocity: 15.2, density: 1940, rotation_period: 13.8 },
-  { name: "Apophis-M", diameter: 0.37, velocity: 30.7, density: 2600, rotation_period: 30.6 }
-];
-
-// Three.js para el visor de asteroides
-let avRenderer, avScene, avCamera, avAsteroid, avLight;
+let asteroidViewerAnimating = false;
 
 function initAsteroidViewerThree() {
   if (!THREE_NS) {
     asteroidCanvas.innerHTML = '<div style="padding:10px;color:#9fb0c7;">Vista 3D desactivada (no se pudo cargar Three.js).</div>';
     return;
   }
-  const width = asteroidCanvas.clientWidth;
-  const height = asteroidCanvas.clientHeight;
-  avRenderer = new THREE_NS.WebGLRenderer({ antialias: true });
-  avRenderer.setSize(width, height);
+
+  const width = Math.max(1, asteroidCanvas.clientWidth || 360);
+  const height = Math.max(1, asteroidCanvas.clientHeight || 260);
+  avRenderer = new THREE_NS.WebGLRenderer({ antialias: true, alpha: true });
   avRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  avRenderer.setSize(width, height);
   asteroidCanvas.innerHTML = '';
   asteroidCanvas.appendChild(avRenderer.domElement);
 
   avScene = new THREE_NS.Scene();
-  avCamera = new THREE_NS.PerspectiveCamera(45, width/height, 0.1, 1000);
-  avCamera.position.set(0, 0, 3);
+  avScene.background = new THREE_NS.Color(0x05070f);
+  avCamera = new THREE_NS.PerspectiveCamera(45, width / height, 0.1, 100);
+  avCamera.position.set(0, 0, 3.2);
 
-  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.6); avScene.add(ambient);
-  avLight = new THREE_NS.DirectionalLight(0xffffff, 1.0); avLight.position.set(3, 2, 4); avScene.add(avLight);
+  const ambient = new THREE_NS.AmbientLight(0xffffff, 0.65);
+  avScene.add(ambient);
+  avLight = new THREE_NS.DirectionalLight(0xfff2d0, 1.15);
+  avLight.position.set(3, 2, 4);
+  avScene.add(avLight);
 
-  const geo = new THREE_NS.SphereGeometry(1, 64, 64);
-  const loader = new THREE_NS.TextureLoader();
-  loader.load('./static/textures/asteroid-texture.jpg', (tex) => {
-    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 }));
-    avScene.add(avAsteroid);
-  }, undefined, () => {
-    avAsteroid = new THREE_NS.Mesh(geo, new THREE_NS.MeshStandardMaterial({ color: 0x8a7f70 }));
-    avScene.add(avAsteroid);
-  });
-
+  regenerateMeteorite({});
+  applyManualTo3D();
   addAsteroidViewerControls();
-  requestAnimationFrame(asteroidViewerAnimate);
+  if (!asteroidViewerAnimating) {
+    asteroidViewerAnimating = true;
+    requestAnimationFrame(asteroidViewerAnimate);
+  }
 }
 
-let avRotSpeed = 0.01; // rad/frame
 function asteroidViewerAnimate() {
-  requestAnimationFrame(asteroidViewerAnimate);
-  if (avAsteroid) {
-    avAsteroid.rotation.y += avRotSpeed;
+  if (avRenderer && avScene && avCamera) {
+    if (avAsteroid) {
+      avAsteroid.rotation.y += avRotSpeed;
+      avAsteroid.rotation.x += avRotSpeed * 0.3;
+    }
+    avRenderer.render(avScene, avCamera);
   }
-  if (avRenderer && avScene && avCamera) avRenderer.render(avScene, avCamera);
+  requestAnimationFrame(asteroidViewerAnimate);
 }
 
 function addAsteroidViewerControls() {
   if (!avRenderer) return;
   const el = avRenderer.domElement;
-  let dragging = false, lastX = 0, lastY = 0;
+  let dragging = false;
+  let lastX = 0, lastY = 0;
   el.style.cursor = 'grab';
-  el.addEventListener('pointerdown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; el.style.cursor = 'grabbing'; });
-  window.addEventListener('pointermove', (e)=>{
-    if (!dragging || !avAsteroid) return;
-    const dx = e.clientX - lastX; const dy = e.clientY - lastY;
-    avAsteroid.rotation.y += dx * 0.01; avAsteroid.rotation.x += dy * 0.01; lastX = e.clientX; lastY = e.clientY;
+  el.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    el.style.cursor = 'grabbing';
   });
-  window.addEventListener('pointerup', ()=>{ dragging = false; el.style.cursor = 'grab'; });
-  el.addEventListener('wheel', (e)=>{ e.preventDefault(); const d = Math.sign(e.deltaY); avCamera.position.z = Math.max(1.5, Math.min(6, avCamera.position.z + d*0.2)); }, { passive: false });
+  window.addEventListener('pointermove', (e) => {
+    if (!dragging || !avAsteroid) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    avAsteroid.rotation.y += dx * 0.01;
+    avAsteroid.rotation.x += dy * 0.01;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  window.addEventListener('pointerup', () => {
+    dragging = false;
+    el.style.cursor = 'grab';
+  });
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = Math.sign(e.deltaY);
+    avCamera.position.z = Math.max(1.4, Math.min(6, avCamera.position.z + delta * 0.2));
+  }, { passive: false });
 }
 
 function updateManualDisplay() {
-  manSpeedValue.textContent = Number(manSpeed.value).toFixed(1);
-  manDensityValue.textContent = `${manDensity.value} kg/m³`;
-  manRotationValue.textContent = `${Number(manRotation.value).toFixed(1)} °/s`;
+  if (manDiameter && manDiameterValue) manDiameterValue.textContent = `${Number(manDiameter.value).toFixed(1)} km`;
+  if (manSpeed && manSpeedValue) manSpeedValue.textContent = Number(manSpeed.value).toFixed(1);
+  if (manDensity && manDensityValue) manDensityValue.textContent = `${manDensity.value} kg/m³`;
+  if (manRotation && manRotationValue) manRotationValue.textContent = `${Number(manRotation.value).toFixed(1)} °/s`;
 }
-[manSpeed, manDensity, manRotation].forEach(el => el && el.addEventListener('input', ()=>{
+
+[manDiameter, manSpeed, manDensity, manRotation].forEach((el) => el && el.addEventListener('input', () => {
   updateManualDisplay();
-  if (viewerMode === 'manual') applyManualTo3D();
+  applyManualTo3D();
 }));
 updateManualDisplay();
 
 function applyManualTo3D() {
-  if (!avAsteroid) return;
-  // Tamaño proporcional a densidad de forma simple (mock): escalar entre 0.5 y 1.3
-  const density = Number(manDensity.value);
-  const scale = 0.5 + (density - 500) / (8000 - 500) * (1.3 - 0.5);
-  avAsteroid.scale.setScalar(Math.max(0.3, Math.min(1.5, scale)));
-  // Velocidad de rotación: base en Rotación (°/s) modulada por Velocidad
-  const degPerSec = Number(manRotation.value);
-  const speed = Number(manSpeed.value);
-  const speedFactor = 0.5 + (speed / 60); // 0..60 -> 0.5x .. 1.5x
-  avRotSpeed = (degPerSec * Math.PI / 180) * 0.016 * speedFactor; // ~60fps
-}
+  const diameterKM = toNumber(manDiameter?.value, meteoriteState.diameterKM);
+  const density = toNumber(manDensity?.value, meteoriteState.density);
+  const rotationDegPerSec = toNumber(manRotation?.value, meteoriteState.rotationDegPerSec);
+  const speed = toNumber(manSpeed?.value, 10);
+  const seed = densityToSeed(density);
 
-function populateApiSelect() {
-  apiAsteroidSelect.innerHTML = '';
-  mockAsteroids.forEach((a, idx) => {
-    const opt = document.createElement('option');
-    opt.value = String(idx);
-    opt.textContent = `${a.name} — Ø ${a.diameter} km, v ${a.velocity} km/s`;
-    apiAsteroidSelect.appendChild(opt);
-  });
-  updateApiDetails();
+  regenerateMeteorite({ diameterKM, density, seed, rotationDegPerSec });
+  const speedFactor = 0.5 + (speed / 60);
+  avRotSpeed = (rotationDegPerSec * Math.PI / 180) * 0.016 * speedFactor;
 }
 
 function updateApiDetails() {
-  const idx = Number(apiAsteroidSelect.value || 0);
-  const a = mockAsteroids[idx];
-  if (!a) { apiAsteroidDetails.value = ''; return; }
-  apiAsteroidDetails.value = `Nombre: ${a.name}\nDiámetro: ${a.diameter} km\nVelocidad: ${a.velocity} km/s\nDensidad: ${a.density} kg/m³\nPeriodo de rotación: ${a.rotation_period} h`;
-  // Al seleccionar, actualizar sliders y 3D y desactivar sliders en modo API
-  manSpeed.value = a.velocity.toString();
-  manDensity.value = a.density.toString();
-  // Aproximación: rotación deg/s desde horas -> suponemos 360° por periodo
-  const degPerSec = 360 / (a.rotation_period * 3600);
-  manRotation.value = (degPerSec * 100).toFixed(1); // amplificar para visualización
-  updateManualDisplay();
-  applyManualTo3D();
+  if (!apiAsteroidDetails) return;
+  const selectedIndex = currentObjectIndex !== null ? currentObjectIndex : Number(apiAsteroidSelect?.value);
+  const objectData = catalog[selectedIndex] || catalog[0];
+  if (!objectData) {
+    apiAsteroidDetails.value = '';
+    return;
+  }
+  if (apiAsteroidSelect && apiAsteroidSelect.value !== String(selectedIndex)) {
+    suppressSelectionEvents = true;
+    apiAsteroidSelect.value = String(selectedIndex);
+    suppressSelectionEvents = false;
+  }
+  apiAsteroidDetails.value = formatObjectDetails(objectData);
+  if (viewerMode === 'api') {
+    syncViewerControlsFromObject(objectData);
+    updateManualDisplay();
+    applyManualTo3D();
+  }
 }
 
-apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', updateApiDetails);
+apiAsteroidSelect && apiAsteroidSelect.addEventListener('change', (event) => {
+  if (suppressSelectionEvents) return;
+  const index = Number(event.target.value);
+  if (!Number.isInteger(index)) return;
+  setActiveObjectByIndex(index, { updateViewer: true, updateDetails: true });
+  suppressSelectionEvents = true;
+  if (objectSelect) objectSelect.value = event.target.value;
+  suppressSelectionEvents = false;
+});
 
 function setViewerMode(mode) {
   viewerMode = mode;
@@ -593,45 +1211,44 @@ function setViewerMode(mode) {
     manualControls.classList.remove('hidden');
     apiControls.classList.add('hidden');
     modeToggle.textContent = 'Modo Manual';
-    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = false);
+    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = false));
   } else {
     manualControls.classList.add('hidden');
     apiControls.classList.remove('hidden');
     modeToggle.textContent = 'Modo API';
-    [manSpeed, manDensity, manRotation].forEach(el => el.disabled = true);
+    [manDiameter, manSpeed, manDensity, manRotation].forEach(el => el && (el.disabled = true));
     populateApiSelect();
+    updateApiDetails();
   }
 }
 
-modeToggle && modeToggle.addEventListener('click', ()=>{
+modeToggle && modeToggle.addEventListener('click', () => {
   setViewerMode(viewerMode === 'manual' ? 'api' : 'manual');
 });
 
-// Toggle view with the header icon. The icon image swaps between asteroid-icon.png and planet-icon.png
-openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', ()=>{
+openAsteroidViewerBtn && openAsteroidViewerBtn.addEventListener('click', () => {
   const img = openAsteroidViewerBtn.querySelector('img');
   const isViewerOpen = !asteroidViewer.classList.contains('hidden');
   if (isViewerOpen) {
-    // Close viewer -> show simulation
     asteroidViewer.classList.add('hidden');
     simLayout.classList.remove('hidden');
     if (img) img.src = './static/img/asteroid-icon.png';
   } else {
-    // Open viewer -> hide simulation
     simLayout.classList.add('hidden');
     asteroidViewer.classList.remove('hidden');
     if (img) img.src = './static/img/planet-icon.png';
-    if (!avRenderer) initAsteroidViewerThree();
-    setViewerMode('manual');
-    setTimeout(()=>{ resizeAsteroidViewer(); }, 0);
+    if (!avRenderer) initAsteroidViewerThree(); else applyManualTo3D();
+    setViewerMode(viewerMode);
+    setTimeout(() => { resizeAsteroidViewer(); }, 0);
   }
 });
 
 function resizeAsteroidViewer() {
   if (!avRenderer || !avCamera) return;
-  const w = asteroidCanvas.clientWidth; const h = asteroidCanvas.clientHeight;
+  const w = Math.max(1, asteroidCanvas.clientWidth);
+  const h = Math.max(1, asteroidCanvas.clientHeight);
   avRenderer.setSize(w, h);
-  avCamera.aspect = Math.max(0.1, w / Math.max(1, h));
+  avCamera.aspect = Math.max(0.1, w / h);
   avCamera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resizeAsteroidViewer);

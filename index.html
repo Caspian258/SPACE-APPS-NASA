@@ -81,6 +81,22 @@
         <button id="show3D">Ver Globo 3D</button>
         <button id="show2D">Ver Mapa 2D</button>
       </div>
+
+      <div class="control-group" style="margin-top:12px;">
+        <label for="dataSourceSelect">Catálogo de objetos</label>
+        <select id="dataSourceSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+          <option value="asteroids">Asteroides</option>
+          <option value="comets">Cometas</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="objectSelect">Seleccionar objeto</label>
+        <select id="objectSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+          <option value="">Cargando catálogo...</option>
+        </select>
+        <div class="value small" id="objectSummary">--</div>
+      </div>
     </section>
 
     <!-- Visualization -->
@@ -144,6 +160,11 @@
         <!-- Controles: Modo Manual -->
         <div id="manualControls">
           <div class="control-group">
+            <label for="manDiameter">Diámetro (km)</label>
+            <input type="range" id="manDiameter" min="0.1" max="1000" step="0.1" value="50" />
+            <div class="value" id="manDiameterValue">50.0 km</div>
+          </div>
+          <div class="control-group">
             <label for="manSpeed">Velocidad (unid.)</label>
             <input type="range" id="manSpeed" min="0" max="60" step="0.1" value="10" />
             <div class="value" id="manSpeedValue">10.0</div>
@@ -163,7 +184,14 @@
         <!-- Controles: Modo API -->
         <div id="apiControls" class="hidden">
           <div class="control-group">
-            <label for="apiAsteroidSelect">Lista de asteroides (mock)</label>
+            <label for="apiDataSourceSelect">Fuente de datos</label>
+            <select id="apiDataSourceSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;">
+              <option value="asteroids">Asteroides</option>
+              <option value="comets">Cometas</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="apiAsteroidSelect">Lista de objetos</label>
             <select id="apiAsteroidSelect" style="width:100%;padding:8px;background:#0b1526;color:#e8eef5;border:1px solid #22304a;border-radius:6px;"></select>
           </div>
           <div class="control-group">
@@ -192,6 +220,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Three.js UMD estable para file:// (r149) -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.149.0/examples/js/controls/OrbitControls.js"></script>
   <script src="static/js/script.js"></script>
 </body>
 </html>
