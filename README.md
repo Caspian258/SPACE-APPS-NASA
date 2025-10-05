@@ -20,7 +20,7 @@
 * **Guía de Archivos de Imagen `/static/`:**
     Para que la interfaz funcione correctamente, asegúrate de que los siguientes archivos de imagen estén en las carpetas correctas y con los nombres especificados.
 
-### Iconos de la Interfaz
+### **Iconos de la Interfaz**
 #### Ubicación: `/static/img/`
 
 * **asteroid-icon.png**
@@ -32,7 +32,7 @@
 * **accessibility-icon.png**
     Ícono ubicado en el pie de página. Sirve para activar y desactivar la paleta de colores de alto contraste para daltónicos.
 
-### Texturas 3D
+### **Texturas 3D**
 #### Ubicación: `/static/textures/`
 
 * **asteroid-texture.jpg:**
@@ -55,6 +55,6 @@ Los resultados son **estimaciones simplificadas** y no deben considerarse como p
 
 ---
 
-## Contribuciones
+## 🏆 **Contribuciones**
 
 Este proyecto fue desarrollado como parte de la 4ta edición del Hackathon **NASA International Space Apps Challenge**. No ha existido contribución por parte de terceros para la elaboración de este proyecto.
